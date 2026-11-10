@@ -35,19 +35,27 @@ data class SoulState(
     }
 }
 
+/** Promjena stanja (može biti negativna; ne ograničava se dok se ne primijeni). */
+private data class Delta(
+    val mood: Double = 0.0,
+    val boredom: Double = 0.0,
+    val anger: Double = 0.0,
+    val attachment: Double = 0.0,
+)
+
 /** Reakcije na poruke korisnika. */
-private val EVENTS: Map<String, SoulState> = mapOf(
-    "greeting" to SoulState(mood = 5.0, attachment = 4.0, boredom = -10.0),
-    "joke" to SoulState(mood = 6.0, boredom = -8.0),
-    "praise" to SoulState(mood = 8.0, attachment = 3.0, anger = -10.0),
-    "insult" to SoulState(mood = -10.0, anger = 20.0, attachment = -3.0),
-    "command" to SoulState(boredom = -3.0, attachment = 1.0),
-    "chat" to SoulState(boredom = -4.0, attachment = 1.0),
+private val EVENTS: Map<String, Delta> = mapOf(
+    "greeting" to Delta(mood = 5.0, attachment = 4.0, boredom = -10.0),
+    "joke" to Delta(mood = 6.0, boredom = -8.0),
+    "praise" to Delta(mood = 8.0, attachment = 3.0, anger = -10.0),
+    "insult" to Delta(mood = -10.0, anger = 20.0, attachment = -3.0),
+    "command" to Delta(boredom = -3.0, attachment = 1.0),
+    "chat" to Delta(boredom = -4.0, attachment = 1.0),
 )
 
 fun SoulState.onEvent(kind: String) {
     val d = EVENTS[kind] ?: throw IllegalArgumentException("Nepoznat događaj: $kind")
-    apply(mood = d.mood, energy = d.energy, boredom = d.boredom, anger = d.anger, attachment = d.attachment)
+    apply(mood = d.mood, boredom = d.boredom, anger = d.anger, attachment = d.attachment)
 }
 
 /** Protok vremena bez obraćanja: raste dosada, ljutnja se smiruje. */
