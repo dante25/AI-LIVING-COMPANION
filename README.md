@@ -8,7 +8,10 @@ Alexa je identitet i ponašanje, a LLM, glas i model su zamjenjivi moduli.
 - Faza 0 (priprema): u toku. Dokumenti u repou, kontrolne sume provjerene.
 - Faza 1 (duša): gotova u Pythonu i Kotlinu, testovi prolaze.
 - Faza 2 (memorija): ugovor i memorija u RAM-u gotovi; SQLite dolazi u fazi 5.
-- Faza 3 (dozvole i sesije): gotova; 38 testova u `core/` prolazi.
+- Faza 3 (dozvole i sesije): gotova.
+- Faza 4 (model sloj): router, eskalacija, budžet, registar modela; cloud adapter i katalog za preuzimanje dolaze kasnije.
+
+U `core/` ukupno 51 test prolazi.
 
 Kotlin testovi se pokreću kompajlerom kotlinc 2.1.0 i JUnit konzolom (Gradle build
 još nije provjeren).
