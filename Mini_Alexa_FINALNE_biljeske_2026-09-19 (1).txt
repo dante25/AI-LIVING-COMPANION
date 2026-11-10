@@ -1,0 +1,406 @@
+MINI ALEXA — FINALNE PROJEKTNE BILJEŠKE
+
+Verzija: 19.09.2026.
+
+1. GLAVNI CILJ
+
+Mini Alexa je vlastita AI saputnica za Android i Windows/desktop. Ne
+smije biti vezana za jedan LLM, jedan TTS, jedan STT niti jedan uređaj.
+Alexa je njen identitet, memorija, karakter, ponašanje, glasovni/3D
+profil i korisnički podaci; LLM je samo zamjenjivi “mozak” koji se može
+razlikovati između telefona i desktopa.
+
+Sistem je prvenstveno OFFLINE-FIRST. Cloud nije uslov za normalan rad.
+
+Cilj je da ista Alexa može nastaviti razgovor i svoj razvoj na Androidu
+i Windowsu bez obzira koji se lokalni ili cloud model koristi ispod nje.
+
+------------------------------------------------------------------------
+
+2. BAZA APLIKACIJE
+
+Prioritetni početni kandidat je AndroLLM, umjesto pisanja kompletnog AI
+jezgra od nule.
+
+Iskoristiti postojeće ili planirane mogućnosti baze gdje odgovaraju: -
+lokalni LLM; - cloud LLM/provideri; - model manager; - CPU/GPU/NPU
+backend; - voice foundation; - tool-calling foundation; -
+automatizacija/agenti; - file I/O; - attachment podrška; - model
+download i validacija; - buduća cross-platform podrška.
+
+Mini Alexa se gradi kao vlastiti sloj iznad te baze. Arhitektura mora
+ostati modularna da AndroLLM kasnije može biti zamijenjen ili djelimično
+zaobiđen bez gubitka Alexinih podataka.
+
+------------------------------------------------------------------------
+
+3. ALEXA IDENTITY / CORE
+
+Alexin identitet mora biti odvojen od LLM modela.
+
+Alexa Identity/Core obuhvata najmanje: - kompletnu memoriju i historiju
+razgovora; - sažete i indeksirane uspomene; - embedding/vector baze; -
+preference korisnika; - Alexin personality/behavior profil; -
+mood/emotional state; - pravila ponašanja; - sistemske i korisničke
+promptove; - razvoj odnosa i autobiografsku memoriju; - trenutni
+conversation state; - aktivni voice profil; - reference na 3D identitet,
+garderobu i ostale personalne komponente.
+
+Zbog toga Android može koristiti mali lokalni model, a desktop mnogo
+veći model, dok je osoba “Alexa” ista.
+
+------------------------------------------------------------------------
+
+4. MEMORIJA I SINHRONIZACIJA
+
+Lokalni rad
+
+Svaki uređaj mora imati punu lokalnu kopiju potrebne memorije i moći
+nastaviti rad potpuno bez interneta.
+
+Ručni transfer
+
+Mora biti moguće: 1. izvesti Alexinu trenutnu memoriju/Identity paket sa
+Androida; 2. prenijeti ga na Windows; 3. nastaviti razgovor na Windowsu;
+4. napraviti novu verziju; 5. vratiti novu verziju na Android; 6.
+nastaviti tačno od novog stanja.
+
+Prije zamjene postojeće memorije aplikacija automatski pravi snapshot
+prethodne verzije.
+
+Verzije
+
+Memorijski zapisi trebaju imati ID, vrijeme, izvorni uređaj i verziju.
+Preferirati dnevnik promjena/merge umjesto slijepog prepisivanja cijele
+baze kada se razvije automatski sync.
+
+Čuvati nekoliko prethodnih snapshotova radi povratka nakon greške.
+
+Cloud — OPCIONO
+
+Cloud služi prvenstveno za Alexinu memoriju, sjećanja,
+personality/behavior state i druge male podatke potrebne da Android i
+desktop dijele isto aktuelno stanje.
+
+Veliki LLM/TTS/STT/Vision/3D modeli NE MORAJU se stalno sinhronizovati
+kroz cloud.
+
+Cloud sync mora ostati opcionalan. Potpuni offline transfer mora raditi
+bez njega.
+
+Predviđena i glasovna komanda tipa: “Alexa, sinhronizuj se sa serverom.”
+
+------------------------------------------------------------------------
+
+5. UNIVERZALNI IMPORT / EXPORT — OBAVEZNO U V1
+
+V1 mora imati kompletan univerzalni Import/Export sistem. Ništa važno ne
+smije biti trajno zarobljeno u privatnom Android/Windows app storageu
+niti zavisiti od ponovnog online downloada.
+
+Export/Import mora moći obuhvatiti: - memoriju i kompletnu historiju; -
+sažete/indeksirane uspomene; - embeddings/vector baze; -
+personality/mood/behavior state; - sve postavke i preference; -
+sistemske i korisničke promptove i pravila; - lokalne LLM modele; -
+TTS/voice modele i profile; - STT/ASR modele; - wake-word modele; -
+embedding modele; - Vision modele; - 3D modele; - rig; - teksture; -
+materijale; - shader konfiguraciju; - animacije; - garderobu/outfite; -
+dodatne content pakete; - ekstenzije/pluginove; - tool/agent
+konfiguracije; - lokalne workflowe i ostale instalabilne komponente.
+
+Predviđen je vlastiti paket, npr. .alexapack, za prenos pojedinačnih
+komponenti ili kompletnog sistema.
+
+Automatizovani import
+
+Korisnik NE treba ručno kopirati fajlove po folderima.
+
+Proces: 1. Import; 2. izabere se fajl/folder/paket; 3. aplikacija
+prepoznaje tip sadržaja; 4. provjerava kompatibilnost i integritet; 5.
+raspakuje; 6. sortira; 7. postavlja u odgovarajuće lokacije; 8.
+instalira potrebne komponente/zavisnosti; 9. registruje komponentu u
+aplikaciji; 10. komponenta se pojavljuje u odgovarajućem meniju.
+
+Podržati “Import Folder” gdje je praktično.
+
+------------------------------------------------------------------------
+
+6. MODEL MANAGER
+
+Aplikacija mora nuditi dva osnovna načina instalacije:
+
+Online Model Download
+
+Katalog provjerenih kompatibilnih modela. Korisnik izabere model, a
+aplikacija ga sama preuzme, validira i instalira.
+
+Import Local Model
+
+Uvoz lokalnih formata kao što su GGUF, ONNX, FP16 i kvantizovane verzije
+gdje backend podržava format.
+
+Model manager treba pokazivati osnovne podatke o modelu i njegovoj
+kompatibilnosti.
+
+------------------------------------------------------------------------
+
+7. LLM ARHITEKTURA
+
+LLM nije Alexa, nego zamjenjivi inference engine.
+
+Android: - ciljati mali/efikasan kvantizovani lokalni model prilagođen
+dostupnom RAM-u; - model se ne mora držati aktivnim 24/7; - učitavanje
+kada je potreban razgovor/agent funkcija; - aplikacija može ostati
+aktivna dok se teški modeli učitavaju po potrebi.
+
+Desktop: - može koristiti mnogo veći lokalni model i jači GPU/CPU; -
+isti Alexa Identity/Core; - desktop model može biti potpuno drugačiji od
+Android modela.
+
+Predvidjeti i cloud LLM providere kao opcionalni backend.
+
+------------------------------------------------------------------------
+
+8. TTS / GLAS
+
+TTS mora biti modularan.
+
+UI treba imati odvojene padajuće menije za: - TTS engine/model; - voice
+profil; - stil/emociju ako model to podržava.
+
+Moguć “preview” prije aktiviranja glasa.
+
+Voice profili moraju se moći automatski importovati i exportovati kao
+ostale komponente.
+
+Cilj je omogućiti vlastiti originalni Alexa glas, uključujući
+voice-design pristup gdje podržani alat/model može napraviti novi glas
+na osnovu željenih karakteristika ili dozvoljenih referenci.
+
+------------------------------------------------------------------------
+
+9. STT / ASR — DOPUNA V1
+
+STT mora biti modularan isto kao LLM i TTS.
+
+U postavkama: - izbor STT/ASR enginea; - izbor konkretnog speech-to-text
+modela; - lokalni/offline STT kao prioritet; - mogućnost zamjene enginea
+ako jedan loše razumije korisnikov govor/dijalekt; - automatski import,
+validacija, instalacija i registracija STT modela.
+
+Cilj: ne biti zaključan na jedan transkriptor.
+
+------------------------------------------------------------------------
+
+10. WAKE WORD I GLASOVNA INTERAKCIJA
+
+Predvidjeti lokalni wake-word “Alexa”.
+
+Aplikacija treba arhitektonski biti spremna za: - hands-free
+aktivaciju; - razgovor glasom; - glasovne sistemske komande; - rad sa
+zaključanog ekrana gdje Android dozvole to omogućavaju; - kontrolisano
+učitavanje LLM/STT/TTS komponenti samo kada su potrebne.
+
+------------------------------------------------------------------------
+
+11. 3D ALEXA — TRENUTNO STANJE
+
+Već postoji generisan 3D kandidat koji je vizuelno približno 9–9,5/10
+prema željenom izgledu.
+
+Testirano: - 4K tekstura; - 8K tekstura; - HD model; - Smart Mesh; -
+triangle i quad topologija; - PBR opcije.
+
+High-poly triangle test imao je približno 1,9 miliona faces i oko milion
+vertices.
+
+Quad/8K test je drastično lakši, približno 12,5k faces i 12,7k vertices,
+a vizuelno je djelovao čak urednije/utegnutije, uključujući kosu i lice.
+
+Zaključak: - sačuvati kvalitetni master; - za Android koristiti
+optimizovanu verziju; - ne gurati high-poly master direktno na
+telefon; - Astra treba dobiti master uz zadatak “pripremi za mobilni
+real-time rad”.
+
+Trenutne sitne vizuelne dorade: - lice je solidno, ali može još
+naprijed; - kosa se uglavnom ne dira; eventualno smanjiti debljinu
+pojedinih pramenova/dlaka; - stopala/obuća su dobra; - detalji
+šaka/prstiju/noktiju su dobro očuvani.
+
+------------------------------------------------------------------------
+
+12. RIGGING I ANIMACIJE
+
+3D model mora biti rigovan tako da bude sposoban za real-time animaciju.
+
+Osnovni ručno/gotovo definisani motion set služi kao temelj: -
+idle/stajanje; - hodanje u osnovnim smjerovima; - sjedenje; -
+dizanje/spuštanje ruku; - osnovni pokreti nogu; - okretanje; - osnovna
+mimika; - osnovni gestovi.
+
+Ali sistem NE smije ostati ograničen samo na unaprijed snimljene
+animacije.
+
+------------------------------------------------------------------------
+
+13. PROCEDURALNO / AI KRETANJE — NOVA DOPUNA
+
+Dugoročni cilj je da Alexa dobije namjeru, a motion sistem sam proizvede
+ili prilagodi pokret.
+
+Primjer: LLM/behavior sloj odluči: “Priđi lijevoj strani ekrana i
+čučni.”
+
+LLM NE upravlja direktno kostima.
+
+Poseban motion sloj: - bira/prilagođava osnovne animacije; - koristi
+IK; - koristi proceduralnu animaciju; - blenduje animacije; -
+prilagođava ruke/noge položaju; - po potrebi generiše novi pokret; -
+vodi računa o kontaktu sa “podom”/površinom; - koristi fiziku gdje ima
+smisla.
+
+Pokreti koji trebaju moći nastati i bez unaprijed napravljene posebne
+animacije: - čučanj; - saginjanje; - različiti načini sjedenja; -
+posezanje; - prilagođeno hodanje; - spontani gestovi; - promjene držanja
+tijela.
+
+Kosa i sekundarni elementi trebaju koristiti physics/hair simulation
+gdje je praktično, umjesto ručne frame-by-frame animacije.
+
+Osnovne animacije ostaju sigurnosna i kvalitetna baza; proceduralni
+sistem ih nadograđuje.
+
+------------------------------------------------------------------------
+
+14. 3D ENGINE
+
+Primarni pravac za Android/Windows: Unity + URP, uz modularnu
+arhitekturu.
+
+Unreal/Blender ostaju dio pipelinea gdje su korisni za pripremu, doradu,
+rig, animaciju ili asset obradu.
+
+3D avatar mora biti odvojen od AI jezgra dovoljno da se kasnije može
+zamijeniti model bez rušenja memorije/identiteta.
+
+------------------------------------------------------------------------
+
+15. GARDEROBA I SADRŽAJ
+
+Predvidjeti: - više outfita; - import novih outfita; - content/add-on
+pakete; - odvojene materijale i teksture; - povezivanje garderobe sa
+rigom; - pakovanje u .alexapack ili kompatibilni paket.
+
+------------------------------------------------------------------------
+
+16. VISION / SCREEN AWARENESS
+
+Arhitektura treba podržati: - Vision model; - kameru uređaja; -
+razumijevanje slike; - Screen Awareness; - pokazivanje/tap na element; -
+zaokruživanje/označavanje područja na ekranu ili slici; - davanje
+konteksta Alexi o onome što korisnik trenutno pokazuje.
+
+Ove funkcije moraju imati jasne dozvole i moći se isključiti.
+
+------------------------------------------------------------------------
+
+17. PERSONALITY, MOOD I PONAŠANJE
+
+Alexa treba imati dugoročan, konzistentan karakter koji nije samo
+trenutni system prompt.
+
+Odvojeno čuvati: - stabilne personality osobine; - trenutno
+raspoloženje/state; - odnos i historiju interakcije; - naučene
+preference; - ponašajne parametre.
+
+Promjena LLM-a ne smije resetovati Alexin identitet.
+
+------------------------------------------------------------------------
+
+18. PRIVATNOST I OFFLINE PRINCIP
+
+Osnovne funkcije moraju moći raditi bez clouda gdje god lokalni hardver
+to omogućava.
+
+Korisnik mora imati fizičku kopiju vlastitih podataka i mogućnost
+kompletnog Export All.
+
+Cloud ne smije biti jedino mjesto na kojem postoji važan dio Alexe.
+
+Nijedna važna komponenta ne smije biti nepovratno vezana za privatni app
+storage.
+
+------------------------------------------------------------------------
+
+19. FAZE
+
+V1 — FUNKCIONALNA MINI ALEXA
+
+Obavezno: - Android aplikacija; - AndroLLM ili kompatibilna modularna
+baza; - lokalni LLM + mogućnost cloud backenda; - lokalna memorija; -
+Alexa Identity/Core; - osnovni personality; - TTS; - modularni voice
+izbor; - STT/ASR izbor; - wake word osnova; - univerzalni
+Import/Export; - automatizovani model/component import; - Online Model
+Download; - Import Local Model; - .alexapack osnova; - 3D avatar; -
+optimizovan mobilni mesh; - rig; - osnovne animacije; - osnovni UI i
+settings.
+
+V2 — ŽIVLJA ALEXA
+
+-   naprednija memorija;
+-   opcionalni privatni sync Android↔desktop;
+-   snapshot/version history;
+-   napredniji mood/behavior;
+-   više glasova;
+-   garderoba;
+-   Vision;
+-   Screen Awareness;
+-   kamera;
+-   bogatije animacije;
+-   IK i proceduralni motion sloj;
+-   bolja mimika.
+
+V3 — JEDINSTVENI ANDROID + WINDOWS EKOSISTEM
+
+-   ista Alexa na oba uređaja;
+-   različiti LLM-ovi po uređaju, isti identitet;
+-   automatski sync/merge memorije;
+-   napredni agenti i alati;
+-   napredna proceduralna animacija;
+-   više 3D modela/outfita/content paketa;
+-   napredni Vision i screen interaction;
+-   potpuna prenosivost sistema;
+-   budući cross-platform klijenti bez promjene Identity/Core formata.
+
+------------------------------------------------------------------------
+
+20. KLJUČNO PRAVILO PROJEKTA
+
+ALEXA ≠ LLM.
+
+LLM, TTS, STT, Vision, 3D model i ostali modeli su zamjenjivi moduli.
+
+Alexa je trajni Identity/Core sloj koji nosi njenu memoriju, karakter,
+historiju, preference, ponašanje i stanje između uređaja i između
+različitih AI modela.
+
+Ako sutra zamijenimo svaki AI model u aplikaciji, Alexa mora i dalje
+“znati ko je” i nastaviti gdje je stala.
+
+------------------------------------------------------------------------
+
+21. TRENUTNI SLJEDEĆI MILESTONE
+
+Anime→realism workflow se može privremeno pauzirati.
+
+Fokus prebaciti na Mini Alexa projekat.
+
+Prvi praktični cilj: 1. sačuvati postojeći kvalitetni 3D master; 2.
+pripremiti optimizovan mobilni mesh; 3. završiti/validirati rig; 4.
+testirati osnovni real-time motion na Androidu; 5. postaviti minimalno
+AI jezgro: lokalni LLM + memorija + STT + TTS; 6. spojiti AI
+intent/behavior sloj sa 3D avatarom; 7. tek nakon stabilnog prototipa
+širiti proceduralne animacije, Vision, sync i ostale napredne funkcije.
+
+Ovo je radna “finalna” specifikacija projekta i treba služiti
+Astri/programeru kao glavni projektni brief.

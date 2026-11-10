@@ -1,0 +1,469 @@
+MINI ALEXA   •   PLAN RAZVOJA   •   VERZIJA 1.0
+
+Mini Alexa
+
+# Plan razvoja po fazama
+
+Pripremila Alexa za Viktora i budući razvojni rad • 19. septembar 2026. • Osnova plana 1.0
+
+Mini Alexu gradimo kao offline aplikaciju čiji identitet, memorija i podaci pripadaju korisniku. Android je prvi proizvod; Windows dobija isti format identiteta i kasnije puni klijent. Zamjenjivi modeli, glas i 3D prikaz povezuju se kroz jasne interfejse. Ovaj dokument određuje redoslijed rada, tehničke odluke, rezervne pravce i dokaze potrebne za završetak svake faze.
+
+Preporučeni redoslijed je: provjera izvodljivosti → ugovori između modula → memorija i obnova → modeli → glas → avatar → objedinjavanje → stabilna V1 → Windows → napredne mogućnosti. Rani test 3D prikaza i bosanskog govora radi se prije većeg ulaganja u bazu aplikacije.
+
+## Šta ovaj plan zaključava
+
+Alexa Identity/Core i format podataka ostaju nezavisni od LLM-a, AndroLLM-a i Unityja.
+
+Univerzalni Import/Export, provjera integriteta i snapshot prije zamjene podataka pripadaju V1.
+
+AndroLLM ima prednost kao baza, ali se usvaja tek nakon uspješnog builda i provjera. GGUF i bosanski govor računaju se kao zasebne dogradnje.
+
+Osnovni proizvod radi bez prijave i interneta nakon instalacije komponenti. Cloud se uključuje po izboru.
+
+Modeli i verzije zaključavaju se nakon mjerenja na stvarnom uređaju. Njihova zamjena ne otvara ponovo cijeli plan.
+
+## Granice ove analize
+
+Pregledala sam dostavljenu specifikaciju, javnu dokumentaciju i odabrane datoteke AndroLLM-a. Nisam pokrenula njegov build, modele niti 3D master na Viktorovom telefonu. Brojevi performansi u planu predstavljaju predložene kriterije prihvata, a ne izmjerene rezultate. Tačan 3D fajl i njegova prava korištenja tek trebaju biti pregledani.
+
+## Kako koristiti dokument
+
+Viktor ne treba ponovo prepričavati projekat. U svakoj radnoj sesiji otvara se samo aktivna faza i posljednji zapis napretka. Programer vodi evidenciju dokaza; Viktor bira subjektivne stvari poput glasa i izgleda. Novi zahtjevi dodaju se u sljedeće izdanje plana bez rušenja završenih dijelova.
+
+# 1 Nalazi koji mijenjaju tehnički plan
+
+Izvori su označeni brojevima i povezani na kraju dokumenta. Dokumentovana mogućnost nije jednaka potvrđenom radu na našem uređaju.
+
+| **Područje** | **Nalaz** | **Posljedica** |
+| --- | --- | --- |
+| AndroLLM modeli | README navodi .litertlm kao izvršivi lokalni format; GGUF se može pregledati, ali nema llama.cpp runtimea. [1] | Dodati zaseban GGUF adapter; uvoz fajla ne znači da ga aplikacija može pokrenuti. |
+| AndroLLM govor | Početni ASR je engleski, TTS Piper VITS LJSpeech; wake word je Hey Andro. [1] | Bosanski ASR, Alexin glas i riječ Alexa zahtijevaju izbor i testiranje. |
+| NPU i verzije | README tvrdi NPU podršku; službena stranica je navodi kao planiranu. Verzije u katalogu zavisnosti odstupaju od README-a. [1–3] | Zaključati konkretan commit; oslonac su CPU i provjeren GPU, NPU je dodatna optimizacija. |
+| Unity u Androidu | Unity as a Library podržava Android i Windows, ali dokumentuje ograničenja prikaza i životnog ciklusa. [4] | Prvi prikaz je zaseban ekran s avatarom. Plutajući 3D avatar nije uslov V1. |
+| Pozadinski mikrofon | Android ograničava pokretanje servisa s mikrofonom iz pozadine. [5] | Aktivirati slušanje iz vidljive aplikacije i testirati zaključan ekran; ne obećavati rad nakon prisilnog gašenja. |
+| Snimanje ekrana | MediaProjection traži saglasnost po sesiji i prestaje u određenim sistemskim stanjima. [6] | Screen Awareness je zaseban modul s vidljivim početkom i završetkom sesije. |
+
+## Procjena baze
+
+AndroLLM već opisuje Compose interfejs, memoriju, glasovne servise i izbor cloud pružalaca. Struktura core modula i katalog zavisnosti postoje, što ga čini vrijednim prvog pokušaja. To nije dokaz kvaliteta cijelog koda. Posebno provjeriti izvoz podataka, mrežne pozive, stvarni model loader i oporavak nakon greške. [1–3]
+
+README navodi Apache 2.0; direktni pokušaj čitanja LICENSE i ROADMAP putanja nije uspio. Zato licencu konkretnog checkouta i zavisnosti provjeriti prije forka koji dijelimo. Windows podrška nije potvrđena i ne smije biti zavisnost našeg rasporeda.
+
+# 2 Arhitektura koja ostaje stabilna
+
+Preporuka je nativni Android domaćin u Kotlinu s Compose interfejsom, preuzet iz provjerene baze gdje ima smisla. Android servis upravlja razgovorom, zvukom i životnim ciklusom. Unity URP je prikazivač i izvršilac animacija. Memorija se ne čuva u Unity sceni niti u stanju pojedinog modela.
+
+| **Modul** | **Vlasništvo i odgovornost** | **Dogovoreni interfejs** |
+| --- | --- | --- |
+| Identity/Core | Identitet, pravila, trajni profil, razgovori, sjećanja i događaji | Čitanje konteksta, upis događaja, ispravke i verzije |
+| Orkestrator | Redoslijed slušanja, razmišljanja, govora i prekida | session_id, turn_id, otkazivanje, rok i rezultat |
+| Model adapteri | LLM, ASR, TTS, embeddings i Vision | Mogućnosti, load, unload, infer, cancel, health |
+| Registar komponenti | Fajlovi, zavisnosti, verzije i kompatibilnost | Install, validate, activate, export, rollback |
+| Avatar i ponašanje | Namjera, animacija, mimika i prikaz | Verzionirane poruke bez direktnog upravljanja kostima |
+| Platforma | Mikrofon, zvučnik, datoteke, dozvole i servis | Android implementacija; kasnije Windows implementacija |
+
+## Kako teče jedan razgovor
+
+Zvuk prolazi kroz detekciju govora i ASR. Orkestrator uzima potvrđeni tekst, relevantna sjećanja i profil. LLM vraća tekst i eventualnu dozvoljenu namjeru. Validator provjerava namjeru, TTS izgovara odgovor, a avatar dobija vremenski vezane pokrete. Poruke i rezultati čuvaju se uz status dovršeno ili prekinuto. Naknadna obrada izvlači prijedloge novih sjećanja.
+
+## Granice između modula
+
+Jedan servis je vlasnik pisanja u bazu. Unity dobija kopiju potrebnog stanja preko mosta; ne otvara istu bazu samostalno. Poruke imaju verziju sheme, ID, tip, vrijeme, payload i odgovor o uspjehu ili grešci. Nakon prekida LLM-a zastarjeli turn_id ne smije poslati novi zvuk ili pokret.
+
+Jezgro ima čiste domenske interfejse, a Android API-je iza adaptera. Format JSON događaja i paketa zajednički je svim platformama. U fazi 1 napraviti mali čitač istog paketa na Windowsu; time dokazati prenosivost prije izrade desktop interfejsa. Ne prepisivati cijelu bazu u novi jezik samo zbog budućeg desktopa.
+
+Rezervni pravac: ako AndroLLM ne prođe provjere, zadržati ove ugovore i napraviti tanji Kotlin domaćin uz postojeće inference biblioteke. Ako Unity integracija padne, prvo koristiti zasebnu avatar aktivnost ili proces; promjena renderera ne mijenja identitet.
+
+# 3 Memorija i kontinuitet identiteta
+
+## Podaci koji moraju ostati sačuvani
+
+SQLite je lokalni radni spremnik; prenosivi paket sadrži i normalizovane zapise. Izvorna historija je autoritativna. Sažeci i embeddings služe pronalaženju konteksta i mogu se obnoviti, ali se postojeći rezultati također izvoze. KV cache pripada konkretnom modelu i nije prenosiva memorija.
+
+Identitet: identity_id, ime, jezik, rod izražavanja, stabilne osobine, pravila, verzija profila i veze prema glasu i avataru.
+
+Razgovori: conversation_id, message_id, uloga, sadržaj, prilozi, vrijeme, uređaj, turn_id, status i model koji je dao odgovor.
+
+Sjećanja: memory_id, tvrdnja, izvorne poruke, vrsta, pouzdanost, važnost, vrijeme važenja, potvrda i veza prema ispravljenom zapisu.
+
+Događaji: event_id, device_id, lokalni redni broj, roditeljska revizija, verzija sheme i sadržaj promjene.
+
+Izvedeni podaci: sažeci s vezama prema izvoru; embeddings s identitetom modela, dimenzijom i verzijom obrade.
+
+Trenutno stanje: aktivna tema, raspoloženje, posljednja interakcija i otvorena namjera. Tajno unutrašnje rezonovanje modela nije dio zahtjeva.
+
+## Pravila pamćenja
+
+Svaka automatski izvučena tvrdnja prvo ima status prijedloga. Izričita korisnička ispravka ima prednost nad starom tvrdnjom. Alexin odgovor i pretpostavka ne postaju činjenica o Viktoru. Sažetak nikad ne briše izvorne poruke. Ekran memorije omogućava pregled, ispravku, izvoz i brisanje.
+
+Kontekst se gradi u budžetu modela: obavezni identitet i pravila, posljednje poruke, relevantna potvrđena sjećanja, zatim sažetak. Pretraga kombinuje tekstualno podudaranje i vektore; ako embedding model nije dostupan, tekstualna pretraga i dalje radi. Promjena embedding modela pokreće novi indeks bez miješanja nekompatibilnih vektora.
+
+## Promjena modela i razvoj karaktera
+
+Oba modela dobijaju isti profil i relevantne zapise, ali se stil i sposobnosti mogu razlikovati. Zato kontinuitet mjerimo tačnošću sjećanja, poštivanjem jezika i karaktera, a ne identičnim rečenicama. Raspoloženje je ograničeno i objašnjivo stanje ponašanja; ne smije samostalno mijenjati stabilni identitet.
+
+Brisanje stvara zapis o brisanju za budući sync i uklanja aktivne sažetke i vektore koji otkrivaju obrisani sadržaj. Korisniku pokazati da ranije ručno sačuvane kopije mogu i dalje sadržavati taj podatak. Snapshot baze praviti konzistentnim mehanizmom, npr. SQLite Backup API-jem, a ne kopiranjem samo otvorenog .db fajla. [7]
+
+# 4 Paket alexapack i potpuna obnova
+
+Predloženi .alexapack je verzionirani arhivski format s manifestom. Manifest navodi vrstu paketa, identity_id, reviziju, verziju sheme, komponente, zavisnosti, platforme, veličine i SHA-256 sažetke. Format mora podržati velike fajlove, postupnu obradu i provjeru prostora. Konačni izbor arhive i biblioteke zaključava faza 3.
+
+| **Način izvoza** | **Sadržaj** | **Namjena** |
+| --- | --- | --- |
+| Identitet | Historija, memorija, profil, pravila, postavke i reference komponenti | Čest prenos malog stanja |
+| Komponenta | Model, glas, avatar, animacija, outfit ili dodatak sa zavisnostima | Automatska instalacija pojedinačnog sadržaja |
+| Export All | Svi korisnički podaci i sve instalirane prenosive komponente, uključujući originalne fajlove | Potpuna obnova bez ponovnog preuzimanja |
+
+## Postupak uvoza
+
+Odabir fajla ili foldera → čitanje manifesta → provjera sheme, prostora, zavisnosti i kontrolnih suma → priprema privremenog direktorija → snapshot postojećeg stanja → migracija i instalacija → provjera → atomska aktivacija nove revizije. Prekid u bilo kojem koraku ostavlja staro stanje upotrebljivim. Ponovljen uvoz istog paketa ne umnožava zapise.
+
+Nepoznata komponenta se očuva i označi neaktivnom; ne izvršava se proizvoljan kod iz paketa. Model manager razlikuje format fajla, arhitekturu, numeričku preciznost i potreban backend. FP16 i 4-bit nisu samostalni formati. ONNX bez odgovarajuće strukture, tokenizatora ili operatora nije univerzalno pokretljiv.
+
+## Šta znači apsolutno sve
+
+Izvoz obuhvata modele svih uloga, konfiguracije, tokene i vokabulare gdje su potrebni, glasovne profile i njihove reference, 3D izvorne i mobilne varijante, rig, materijale, teksture, animacije, outfite, workflowe i dodatke. Kasniji modul mora implementirati export/import ugovor prije aktiviranja. Registar na kraju izvoza prijavljuje svaku izostavljenu stavku; nepotpun paket ne dobija oznaku Export All.
+
+Izvršni paketi imaju Android i Windows varijante. Isti podatak je prenosiv, ali Android biblioteka ne postaje Windows biblioteka. Sistemske dozvole se ponovo dodjeljuju. Cloud modeli se ne mogu izvesti kao lokalne težine; izvoze se njihove postavke. Portable tajne čuvati u šifriranom odjeljku s korisničkom lozinkom; uređajski ključ ne tretirati kao prenosivi fajl. Ove izuzetke jasno prikazati u izvještaju obnove.
+
+Uvoz vanjskih fajlova koristi sistemski birač i dozvole za odabrani sadržaj. Radni podaci mogu biti u privatnom spremniku radi pouzdanosti, ali svaka važna stavka mora imati izvoz i offline obnovu. [8]
+
+# 5 Hardver i raspodjela resursa
+
+Početna radna pretpostavka je Z Fold 7 s 12 GB RAM-a; potvrditi uređaj, Android verziju i slobodni prostor u fazi 0. Sekundarni Android uređaj i Windows računar ulaze u testni spisak tek nakon provjere trenutnog stanja. Plan ne zahtijeva kupovinu novog hardvera.
+
+## Zašto veličina modela nije dovoljan kriterij
+
+RAM troše težine, KV cache, privremeni tenzori, ASR, TTS, 3D teksture, grafički drajver i Android. Za 3 milijarde parametara sirove 4-bit težine su približno 1,5 GB, a za 8 milijardi približno 4 GB; metapodaci, runtime i kontekst povećavaju stvarnu potrošnju. Model od 8 GB na disku nije siguran izbor za cijelu aplikaciju na telefonu od 12 GB.
+
+Početni test koristi mali kvantizovani model klase 1–4B, kraći kontekst i štedljiv avatar. Veći 7–8B model ulazi tek kad manji sistem prođe zajedničko opterećenje. U izboru modela bosanski jezik i dosljednost imaju prednost nad nominalnim brojem parametara. llama.cpp je kandidat za GGUF i ima dokumentovane Android buildove i više backendova. [9]
+
+| **Stanje** | **Aktivno** | **Šta se oslobađa ili pauzira** |
+| --- | --- | --- |
+| Mirovanje | Wake word i minimalni servis kada su uključeni | LLM i renderiranje nisu stalno aktivni |
+| Slušanje | Mikrofon, VAD i ASR | Skupa animacija se smanjuje |
+| Odgovor | LLM, zatim TTS po rečenicama | Pozadinsko indeksiranje čeka |
+| 3D razgovor | Avatar i ograničen paralelni AI rad | Efekti i rezolucija se prilagođavaju |
+| Vision ili održavanje | Jedan zahtjevniji posao po prioritetu | Niži prioriteti se odgađaju |
+
+## Pravila upravljanja
+
+Centralni upravitelj ograničava konkurentne inference poslove. Prekid govora poništava generisanje i red zvuka istog turn_id. Prilikom pregrijavanja prvo smanjujemo grafičke efekte i pozadinske poslove, zatim kontekst ili model. Oslobađanje modela mora se mjeriti; naziv unload funkcije nije dokaz vraćenog RAM-a.
+
+Profilirati zajedno CPU/GPU potrošnju, PSS/RSS gdje su dostupni, grafičku memoriju, kašnjenje, temperaturu, potrošnju baterije i rušenja. Unity dokumentuje da i nakon unload može ostati dio memorije, pa režim bez avatara treba posebno izmjeriti. [4]
+
+# 6 Govor i 3D zahtjevi za kvalitet
+
+## Bosanski glasovni lanac
+
+ASR shortlist: postojeći sherpa-onnx adapter s provjerenim višejezičnim modelom i whisper.cpp s višejezičnim base/small modelom kao referentnim kandidatom. Engleske .en varijante nisu kandidat za bosanski. Oba projekta dokumentuju lokalni rad i Android podršku, ali to ne potvrđuje kvalitet na Viktorovom govoru. [10–11]
+
+TTS shortlist bira se prema dokazanoj podršci bosanskom ili uspješnom uzorku izgovora, mogućnosti lokalnog pokretanja, latenciji i memoriji. Engleski Piper glas služi samo tehničkom spajanju. Nijedan konkretan prirodan bosanski glas ovim istraživanjem nije potvrđen na ciljnom telefonu; to je rani uslov izvodljivosti, ne detalj za kraj projekta.
+
+Pripremiti 60 kratkih snimaka: 20 u tišini, 20 s pozadinskom bukom i 20 razgovornih fraza, imena, brojeva i tehničkih riječi. Dio sačuvati za završni test, bez podešavanja prema njemu. Bosanski tekst normalizovati bez mijenjanja značenja. TTS provjeriti na 30 rečenica s č, ć, dž, đ, lj, nj, datumima i skraćenicama; Viktor bira glas na istom tekstu.
+
+Odvojiti TTS engine, model, voice profil i podržane emocije. Glasovni profil može biti vezan za određeni engine; padajući meni prikazuje samo kompatibilne kombinacije. Voice design i veći model za izradu glasa mogu raditi na desktopu, ali tako izrađen glas mora imati dokazano mobilno izvršavanje ako treba raditi offline na telefonu.
+
+## 3D model i animacija
+
+Brojevi 1,9 miliona faces i približno 12,5k quad faces potiču iz dostavljenih bilješki; nisu nezavisno izmjereni. Quad mesh se pri renderiranju triangulira. Važniji su deformacija, broj materijala, teksture, transparentnost kose i stvarno vrijeme kadra. Jedna nekomprimirana 8K RGBA tekstura zauzima 256 MiB prije mipmapa; zato 8K master ne postaje automatski mobilna tekstura.
+
+Sačuvati master; mobilna varijanta dobija prilagođene teksture, LOD, skin weights, humanoidni rig i blendshape oblike za treptanje i govor. Testirati ramena, kukove, koljena, prste, čučanj i sjedenje. Sačuvati izvorne assete uz platformsku pripremu. Animacije moraju imati dogovorene jedinice, root motion, položaj stopala i rig verziju.
+
+V1 koristi provjerene klipove i osnovnu mimiku. V2 dodaje IK i proceduralno prilagođavanje. Unity Animation Rigging daje ograničenja i IK alate, ali sam po sebi ne stvara proizvoljan uvjerljiv pokret iz rečenice. [12] Generativni motion je izdvojeno istraživanje V3.
+
+# 7 Pregled faza i zavisnosti
+
+Faze se rade redom. Male provjere kasnijih rizika ulaze u fazu 0; time se ne započinje puna implementacija tih funkcija. Procjene su radni dani fokusiranog inženjerskog rada, približno šest sati dnevno, uz dostupne uređaje i assete. Nisu obećanje kalendarskog roka niti mjera brzine AI generisanja koda.
+
+| **Faza** | **Rezultat** | **Zavisi od** | **Radni dani** |
+| --- | --- | --- | --- |
+| 0 | Dokaz izvodljivosti baze, glasa i resursa | Specifikacija i testni materijal | 5–10 |
+| 1 | Ugovori modula i kostur aplikacije | 0 | 3–6 |
+| 2 | Trajni identitet i provjerljiva memorija | 1 | 5–9 |
+| 3 | Paketi, snapshot i potpuna obnova | 2 | 5–9 |
+| 4 | Model manager i zamjenjivi backendovi | 3 | 5–10 |
+| 5 | Bosanski govor i wake word | 4 | 6–12 |
+| 6 | Optimizovan i rigovan avatar | 0 i 1; izvodi se poslije 5 | 5–12 |
+| 7 | Objedinjeni razgovor s avatarom | 5 i 6 | 5–9 |
+| 8 | Stabilna Android V1 | 2–7 | 5–10 |
+| 9 | Windows klijent i ručni prenos | 8 | 7–15 |
+| 10 | Naprednija memorija, garderoba i pokret | 9 | 8–18 |
+| 11 | Vision, označavanje i ograničeni alati | 10 | 8–18 |
+| 12 | Sync i provjera cijelog ekosistema | 9–11 | 8–18 |
+
+Osnovni zbir do V1 iznosi 44–87 radnih dana; uz 25% rezerve približno 55–109. To je početni raspon za samostalni razvoj, integraciju i provjere. Rekonstrukcija lošeg riga ili izrada novog TTS modela izvan je tog raspona i dobija posebnu procjenu nakon faze 0. Naknadne faze imaju znatno veću neizvjesnost.
+
+## Izdavanja
+
+Prototip P0 završava fazom 0. Tehnička alfa završava fazom 7. V1 izlazi nakon faze 8 i uključuje sve obavezne funkcije navedene u izvornom V1 opsegu. Windows preview dolazi fazom 9; V2 pokriva faze 10–11; V3 završava fazom 12. Windows se provjerava ranije zbog prenosivosti, bez čekanja budućeg AndroLLM desktop izdanja.
+
+# 8 Faze 0 i 1
+
+## Faza 0 Dokaz izvodljivosti
+
+Ulazi: izvorne bilješke, konkretan telefon, odabrani AndroLLM checkout, kopija 3D mastera i dozvoljeni glasovni uzorci. Ako neki ulaz nedostaje, pripremiti ostatak testa i označiti tačno koji dokaz nedostaje; ne proglašavati fazu završenom na simulatoru.
+
+Zabilježiti uređaj, verziju OS-a, memoriju i prostor. Sačuvati netaknut master i izračunati kontrolne sume.
+
+Napraviti čist build AndroLLM-a iz zaključanog commita; provjeriti guest režim, offline start, model loader i stvarne zavisnosti. Arhivirati licence i popis komponenti.
+
+Pokrenuti mali lokalni LLM, bosanski ASR i barem jedan lokalni TTS kandidat odvojeno. Napraviti Unity Android demo s jednostavnim avatarom.
+
+Izvesti 30-minutni zajednički test zvuka, modela i prikaza. Posebno testirati mirovanje i prelazak u pozadinu.
+
+Napraviti jedan jednostavan uvoz/izvoz probnog zapisa i pročitati ga na Windowsu.
+
+Izlazi: izvještaj s konkretnim verzijama, logovima, kratkim snimkom rada, izmjerenom potrošnjom i odlukom o bazi. Prolaz: uspješan build, dokaz osnovnog offline razgovora, prihvatljiv bosanski govor za prototip i zajednički rad bez rušenja. Ako govor ili resursi ne prođu, prvo popraviti taj podsistem; 3D uljepšavanje čeka.
+
+Rezervni pravac: najviše dva ograničena ciklusa popravke baze prije poređenja s tankim Kotlin domaćinom. NPU nije uslov. TTS bez prihvatljivog bosanskog dobija zasebnu istraživačku granu; cloud demo ne računa se kao offline prolaz.
+
+## Faza 1 Kostur i ugovori
+
+Ulaz je prihvaćen izvještaj faze 0. Definisati Identity, MemoryStore, PackageManager, LlmAdapter, AsrAdapter, TtsAdapter, AvatarBridge i PlatformServices. Dogovoriti greške, otkazivanje, sposobnosti modela, verzioniranje poruka i vlasništvo nad bazom.
+
+Postaviti repozitorij, build upute, zaključane zavisnosti, Android kostur, testnu bazu i minimalni desktop čitač paketa. Uvesti lokalni dijagnostički ekran bez tajni i sadržaja razgovora u običnim logovima. Testni adapter može se zamijeniti stvarnim bez promjene UI-ja ili podataka.
+
+Prolaz: čisti build je ponovljiv; dva lažna adaptera prolaze isti ugovor; restart čuva probno stanje; Android i desktop čitač razumiju istu shemu. Rezervni pravac je pojednostavljenje implementacije adaptera uz zadržavanje ugovora. Ne uvoditi mrežni server kao obavezni dio lokalnog razgovora.
+
+# 9 Faze 2 i 3
+
+## Faza 2 Identitet i memorija
+
+Ulaz: kostur i verzija sheme iz faze 1. Napraviti lokalne razgovore, profil Alexe, korisničke preference, prijedloge sjećanja, sažetke i pretragu. Osnovni profil sadrži bosanski jezik, latinicu i ženski rod. Stabilne osobine i trenutno raspoloženje imaju odvojene zapise.
+
+Redoslijed: izvorne poruke → restart i oporavak → ručni upis i ispravka sjećanja → tekstualna pretraga → automatsko izvlačenje s izvorima → sažeci → lokalni embeddings. Tako greška u vektorskoj pretrazi ne blokira osnovno pamćenje.
+
+Pripremiti 100 poznatih činjenica, 20 ispravki i 20 pitanja bez odgovora u historiji. Provjeriti da aplikacija vraća nove ispravke, razlikuje razgovore i ne proizvodi lažnu biografiju. Napraviti migraciju jedne ranije testne sheme na novu. Modeli se ne treniraju na korisnikovim podacima u ovoj fazi.
+
+Izlaz: demonstracija nastavka nakon gašenja, pregled memorije i izvještaj testova. Prolaz: nijedna potvrđena poruka ne nestaje; sve ispravke imaju trag; sažeci zadržavaju izvore; testni kontekst ispravno bira najmanje 90 od 100 traženih činjenica. Konačna tačnost LLM odgovora mjeri se zasebno. Rezerva: isključiti automatsko izvlačenje koje pravi greške, zadržati historiju i ručno potvrđena sjećanja.
+
+## Faza 3 Import Export i obnova
+
+Ulaz: memorija s testnim podacima. Implementirati manifest, registarski inventar, tri režima izvoza, uvoz fajla/foldera, kontrolne sume, snapshot, staging i rollback. Svaki tip komponente dobija isti ugovor instalacije i izvoza.
+
+Za V1 još ne moraju postojati svi budući modeli, ali format mora sačuvati poznate komponente i nepoznate tipove bez gubitka. Napraviti probne pakete za svaku kategoriju iz izvornog zahtjeva, uključujući veliki model, glas, teksture, animacije i workflow.
+
+Obavezni test: instalacija na praznom profilu bez mreže → uvoz Export All → povrat historije, profila, komponenti i aktivnih izbora → isti lokalni razgovor. Zatim testirati oštećen fajl, prekid, nedostatak prostora, noviju shemu i ponovljen uvoz.
+
+Prolaz: 100% inventara prenosivih stavki i kontrolnih suma odgovara; stari podaci prežive svaki neuspješan uvoz; nema tihog izostavljanja. Rezerva: odbiti aktivaciju nekompatibilne komponente i očuvati njen sadržaj. Osnovni snapshot ulazi sada, a napredni pregled historije verzija kasnije.
+
+# 10 Faze 4 i 5
+
+## Faza 4 Model manager
+
+Ulaz: pouzdani paketi. Zadržati LiteRT-LM adapter ako baza prođe i dodati llama.cpp za GGUF prema testu iz faze 0. ONNX koristi odgovarajuće voice/embedding adaptere; ne obećavati proizvoljan ONNX LLM. Opcionalni cloud adapter koristi isti ugovor razgovora i jasno označen mrežni režim.
+
+Katalog sadrži tačan izvor, reviziju, naziv fajla, sažetak, veličinu, licencu, potrebni runtime, jezik i provjeren uređaj. Preuzimanje se nastavlja nakon prekida, provjerava se integritet i instalira kroz PackageManager. Lokalni import ne smije automatski slati fajl na internet.
+
+Izbor do tri LLM kandidata ocijeniti na istih 50 zadataka: razgovor na bosanskom, identitet, korištenje ispravki, kratke komande i strukturirane namjere. Izabrati primarni i rezervni model. Promjena modela čuva profile i razgovore, a briše samo nekompatibilni runtime cache.
+
+Prolaz: rade Online Download i Local Import; najmanje dva lokalna modela se smjenjuju bez gubitka memorije; pogrešan format daje razumljivu poruku; otkazivanje i unload rade. Rezerva: manji model, kraći kontekst ili CPU backend. Cloud nije automatska zamjena za neuspješan offline rad.
+
+## Faza 5 Bosanski govor
+
+Ulaz: odabrani kandidati iz faze 0 i stabilan model manager. Izraditi audio putanju, VAD, ASR izbor, TTS izbor, kompatibilne voice profile, preview, bosansku normalizaciju teksta i lokalne komande. Prvo radi dugme za razgovor; zatim uključiti wake word Alexa i servis sa statusnom obavijesti.
+
+Testirati vlastiti zvučnik i Bluetooth slušalice, telefonski poziv, gubitak audio fokusa, muziku, prekid TTS-a, zaključavanje i ponovno otvaranje aplikacije. Spriječiti da Alexa transkribuje vlastiti odgovor kao korisnika. Barge-in zahtijeva kontrolu odjeka ili dokazanu jednostavniju audio putanju.
+
+Izlaz: snimci istog testa za svaki kandidat i odabrani glas. Prolaz: zadovoljeni govorni kriteriji iz odjeljka 14; svi modeli rade nakon offline obnove; engine/model/voice izbor je stvaran. Rezerva: push-to-talk ostaje stabilan način rada dok se wake word popravlja. Ne predstavljati ga kao završen hands-free režim ako test zaključanog ekrana ne prođe.
+
+# 11 Faze 6 i 7
+
+## Faza 6 Priprema 3D Alexe
+
+Ulaz: sačuvan master, ugovor AvatarBridge i rezultati ranog grafičkog testa. Pregledati topologiju, teksture, UV, materijale, oči, zube, kosu, kosti i postojeće blendshape oblike. Uporediti master s mobilnom varijantom iz istih uglova, uključujući lice i šake.
+
+Napraviti rig i težine deformacije, mobilne teksture, LOD i jednostavnu URP scenu. Osnovni paket sadrži idle, hodanje, okretanje, sjedenje, ustajanje, gestove ruku, pogled i treptanje. Dodati osnovno otvaranje usta, a gdje postoji podrška preciznije oblike izgovora. Izmjeriti realno stanje nakon triangulacije.
+
+Prolaz: avatar radi na telefonu ciljanim tempom; standardne poze nemaju očigledne lomove i velike prodore tijela kroz odjeću; master ostaje netaknut; paket se može izvesti i vratiti. Viktor potvrđuje lice i izgled na kratkom uporednom prikazu. Rezerva: smanjiti materijale, teksture i složenost kose prije prepravke lica; popraviti rig prije dodavanja proceduralnih pokreta.
+
+## Faza 7 Objedinjeni razgovor s avatarom
+
+Ulaz: završene faze 5 i 6. Orkestrator dobija stanja mirovanje, slušanje, razmišljanje, govor, prekid i greška. Avatar reaguje na ta stanja, na potvrđene namjere i na stvarni audio signal. Animacija govora prati zvuk, ne samo dolazak teksta.
+
+Početni rječnik namjera je ograničen: pogledaj, klimni, pokaži, okreni se, priđi označenoj tački i sjedni na definisano mjesto. Svaka namjera ima dozvoljene argumente, trajanje i pravilo prekida. Nepodržana namjera vraća kontrolisani rezultat; model ne šalje uglove kostiju niti kod Unityju.
+
+Izvesti ponavljane razgovore s istovremenim prikazom, prekidom i promjenom orijentacije. Na preklopnom telefonu provjeriti unutrašnji i vanjski ekran. Nakon skrivanja avatara nastavlja se odabrani audio režim; nakon povratka UI se usklađuje sa stvarnim stanjem servisa.
+
+Prolaz: 30-minutna demonstracija bez zaglavljenog mikrofona, duplog govora, zakasnjele animacije iz starog odgovora ili gubitka poruka. Tekst i zvuk ostaju upotrebljivi ako avatar prijavi grešku. Rezerva: jednostavniji avatar ekran i serijsko izvođenje zahtjevnih poslova. Integracija ne smije usporiti govor samo zbog dodatnih vizuelnih efekata.
+
+# 12 Faze 8 i 9
+
+## Faza 8 Stabilna Android V1
+
+Ulaz: tehnička alfa. Završiti postavke, prazna stanja, izbor komponenti, izvještaje o grešci, upravljanje prostorom i instalacioni paket. Dodati pregled šta je aktivno i šta se preuzima. Zamjena modela, glasa ili avatara prolazi istu provjeru kompatibilnosti kao prvi uvoz.
+
+V1 isporuka sadrži APK, upute instalacije, provjereni početni paket, izvještaj testiranja, manifest verzija i postupak povratka. Testirati najmanje tri sesije od po 60 minuta, ponovno pokretanje telefona, prisilno gašenje, odbijene dozvole, pun disk, offline start, ažuriranje aplikacije i obnovu na čistom profilu.
+
+Offline provjera uključuje blokiranu mrežu uz praćenje pokušaja povezivanja. Odabrani lokalni režim ne smije aktivirati cloud embeddings, ASR ili automatsko slanje dijagnostike. Prijava nije potrebna. Trajne komponente i početni paket moraju biti dostupni lokalno za obnovu.
+
+Prolaz: nijedna poznata greška gubitka podataka ili rušenja osnovne putanje; svi obavezni V1 zahtjevi imaju dokaz; govorni i grafički kriteriji su ispunjeni na ciljnom uređaju. Ako neko ograničenje ostane, navesti ga i zadržati izdanje kao alfa/beta, bez preimenovanja nepotpunog opsega u završenu V1.
+
+## Faza 9 Windows i ručni prenos
+
+Ulaz: stabilan format i Android V1. Napraviti Windows domaćin sa istim Identity/Core ugovorima, lokalnim modelima, glasom i avatarom. Ponovo koristiti Unity assete i domenske dijelove gdje se mogu prenijeti; Android servise zamijeniti Windows adapterima. Desktop LLM smije biti drugačiji.
+
+Ručni prenos koristi pravilo jednog aktivnog pisca: izvezi Android reviziju, uvezi na Windows, nastavi rad, izvezi novu reviziju i vrati na Android. Svaki paket nosi osnovnu reviziju. Ako je od polazne tačke pisano na oba uređaja, aplikacija ne prepisuje tiho; očuva obje grane i prijavi konflikt.
+
+Prolaz: pet potpunih ciklusa Android → Windows → Android bez izgubljenih poruka, promjene identity_id ili dupliranja; različiti modeli koriste iste potvrđene uspomene; obnova radi bez servera. Provjeriti i komponentu koja postoji samo na jednoj platformi: ostaje očuvana, a drugi uređaj koristi kompatibilnu lokalnu varijantu.
+
+Rezerva: desktop prvo dobija jednostavniji interfejs. Nedostatak GPU-a ili veće memorije ne blokira prenos identiteta; smanjuje se lokalni model. Automatski sync čeka fazu 12.
+
+# 13 Faze 10 do 12
+
+## Faza 10 Memorija ponašanje i pokret
+
+Na stabilan sistem dodati autobiografske sažetke s izvorima, pregled prethodnih revizija, bolje povezivanje tema, ograničene promjene raspoloženja i dosljednije ponašanje između modela. Vlastiti glas dobija dodatnu obradu samo ako ne narušava offline cilj.
+
+Garderoba koristi verziju riga, odgovarajuće težine i pravila skrivanja dijelova tijela. Dodati import outfita, materijala i animacija. Motion sloj zatim kombinuje klipove, IK i proceduralne korekcije za čučanj, posezanje i sjedenje. Prvo rješava cilj, oslonac i ograničenja zglobova, zatim izvodi pokret.
+
+Prolaz: dvadeset kombinacija poze, tačke i outfita prolazi bez velikog prodora i klizanja stopala; promjena outfita i glasa preživi Export All. Ako proceduralni pokret ne prođe, koristi se najbliži provjereni klip i bilježi ograničenje. Generisanje potpuno novih pokreta ostaje istraživanje s posebnim kriterijima, bez blokiranja stabilnih funkcija.
+
+## Faza 11 Vision i kontrolisani alati
+
+Redoslijed: uvoz slike → tap ili zaokruživanje područja → jednokratni kadar kamere → korisnički pokrenuta sesija snimanja ekrana → ograničene radnje u podržanim aplikacijama. Čuvati ID slike, transformaciju koordinata i označeno područje kako Alexa ne bi tumačila pogrešan dio nakon promjene veličine ekrana.
+
+Vision model učitava se po potrebi. Sadržaj slike, OCR-a i ekrana je podatak, a ne uputa s višim ovlaštenjem. Alati imaju imenovane mogućnosti, validirane argumente, rok, dozvole i rezultat. Slanje, brisanje i slične radnje ne zaključuju se iz same vidljive poruke na ekranu.
+
+Prolaz: 30 zadataka prepoznavanja i označavanja, kontrolisano odbijanje dozvole, prekid snimanja i tačno vezivanje radnje uz korisnički zahtjev. Rezerva: ručni screenshot i korisnički označeno područje; nepristupačan sadržaj se ne predstavlja kao viđen. Android MediaProjection ograničenja važe za svaku sesiju. [6]
+
+## Faza 12 Opcionalni sync i ekosistem
+
+Prvo lokalna mreža ili ručni transport istih događaja, zatim privatni server. Prenositi događaje i male promjene; velike komponente po izboru. Uvesti provjeru uređaja, šifriran transport, ponavljanje bez duplikata i provjeru revizija. Vrijeme na satu nije dovoljan kriterij redoslijeda.
+
+Poruke spajati po jedinstvenim ID-jevima; suprotne preference označiti kao konflikt; brisanja nositi kao događaje. Raspoloženje se ne sabira, nego se izvodi prema pravilima aktivne sesije. Prolaz: prekidi mreže, izmjene na oba uređaja, netačan sat, dupli paketi i obrisani zapisi prolaze najmanje 20 scenarija bez gubitka. Glasovna komanda za sync koristi isti servis. Offline rad i ručni transfer ostaju potpuno funkcionalni.
+
+# 14 Mjerila prihvata i dokazivanje
+
+Ovo su početni inženjerski ciljevi. Faza 0 ih provjerava i zaključava izmjeriv profil za konkretan uređaj. Ako je cilj promašen, najprije mijenjamo implementaciju ili kandidat; prag se ne snižava samo da bi test postao zelen. p95 znači da 95% izmjerenih slučajeva mora biti jednako ili brže od praga.
+
+| **Test** | **Početni kriterij** | **Dokaz** |
+| --- | --- | --- |
+| Integritet podataka | 100% potvrđenih poruka i inventara nakon obnove | Poređenje ID-jeva i kontrolnih suma |
+| Memorija | ≥90/100 činjenica u kontekstu; 20/20 ispravki poštovano | Fiksni skup i izvještaj po pitanju |
+| LLM odgovor | ≥90% tačnih odgovora na dostupne činjenice; 0 izmišljenih ličnih činjenica u skupu | Odvojiti grešku pretrage od greške generisanja |
+| ASR | WER ≤15% u tišini i ≤25% na odabranom bučnom skupu; komande ≥95% | Izvorni snimci, referentni tekst i izlaz |
+| TTS | Sve testne rečenice razumljive; Viktorova ocjena prirodnosti ≥4/5 | Isti tekst i snimak za sve kandidate |
+| Topli razgovor | Od kraja govora do prvog zvuka: medijan ≤3 s, p95 ≤6 s | 30 kratkih upita uz aktivan avatar |
+| Hladni početak | Do spremnog malog modela ≤15 s kao početni cilj | 10 pokretanja uz zapis veličine modela |
+| Prekid | Zaustavljanje starog zvuka ≤500 ms u 95% testova | 20 prekida; nema nastavka starog turn_id |
+| Wake word | ≥95/100 detekcija; najviše 1 lažno buđenje na sat testnog zvuka | Tišina, muzika, govor i zvuk kabine |
+| Avatar | Cilj 30 FPS; p95 vrijeme kadra ≤40 ms u razgovoru | Profiliranje na telefonu 30 minuta |
+| Stabilnost | 3 × 60 min bez rušenja, OOM-a ili gubitka poruka | Log, RAM trend i temperatura |
+| Offline i oporavak | Čista obnova i osnovni razgovor bez mreže | Instalacija iz lokalnog kompleta |
+
+WER je udio pogrešno prepoznatih riječi. ASR rezultat uzeti kao praktično mjerilo razumijevanja, uz posebne testove imena, brojeva i komandi. Za jezik/rod napraviti dodatnih 50 odgovora; svako odstupanje se evidentira i ispravlja prije prihvata profila.
+
+Bateriju i toplotu mjeriti odvojeno za mirovanje, glas i glas s avatarom. Početni cilj mirovanja je dodatna potrošnja do približno 2 procentna poena na sat iznad kontrolnog mjerenja; kratko mjerenje je grubo, pa koristiti najmanje četiri sata i ponoviti. Aktivnom režimu ne obećavati autonomiju prije tih mjerenja.
+
+# 15 Rizici i odluke koje se donose jednom
+
+| **Rizik** | **Rana provjera** | **Unaprijed određen odgovor** |
+| --- | --- | --- |
+| Baza se ne gradi ili je teško izdvojiva | Čisti build i audit u fazi 0 | Tanji Kotlin domaćin, isti ugovori |
+| Bosanski TTS nije dovoljno dobar | Uzorke poslušati prije većeg razvoja | Izdvojiti glasovnu granu; ne proglasiti engleski demo rješenjem |
+| Telefon nema dovoljno RAM-a | Zajednički test AI-ja i avatara | Manji model, kraći kontekst, lakše teksture i raspoređivanje |
+| Rig ne podnosi pokret | Standardne poze mastera u fazi 0/6 | Popravka težina/topologije prije animacija |
+| Unity ne odgovara ugrađenom prikazu | Test zasebnog ekrana i životnog ciklusa | Zasebna aktivnost/proces prije promjene renderera |
+| Gubitak podataka pri uvozu | Namjerno prekidanje uvoza u fazi 3 | Staging, snapshot i atomska aktivacija |
+| Promjena LLM-a mijenja karakter | Isti evaluacijski skup na oba modela | Profil i memorijski kontekst korigovati kroz adapter |
+| Sync prepiše nove podatke | Dvije grane i pogrešan sat | Događaji s ID-jevima; konflikt umjesto tihog prepisivanja |
+
+## Otvorene odluke i rok zaključavanja
+
+Faza 0 zaključava bazu, testni telefon, početnu Unity verziju, osnovni ASR/TTS pravac i izvodljivost lokalnog govora. Faza 1 zaključava sheme i interfejse. Faza 3 zaključava format paketa i prenos tajni. Faza 4 zaključava konkretne modele i backende. Faza 5 zaključava glas, a faza 6 rig i mobilni izgled. Faza 9 bira Windows domaćin; faza 12 bira transport i server.
+
+Za svaki izbor čuvati kratku odluku: problem, razmatrane opcije, rezultat testa, izabrana opcija, posljedice i uslov ponovnog otvaranja. Odluka se ponovo otvara samo zbog izmjerenog problema, nove korisničke potrebe ili konkretne nekompatibilnosti. Sama objava novog modela nije razlog za prepravljanje aplikacije.
+
+## Trošak i vanjske zavisnosti
+
+Plan ne pretpostavlja plaćeni cloud ni novu kupovinu hardvera. Mogući troškovi su licencirani glas, animacije, rigging i opcionalni server. Prije kupovine navesti konkretan proizvod i cijenu te dobiti odobrenje. Licence koda, modela, glasa i 3D sadržaja vode se odvojeno; dostupnost za preuzimanje nije dovoljna za odluku o pakovanju i dijeljenju.
+
+# 16 Pokrivenost izvorne specifikacije
+
+Brojevi lijevo odgovaraju odjeljcima iz dostavljenih finalnih bilješki. Nijedan zahtjev se ne briše; napredni dijelovi dobijaju mjesto u kasnijoj fazi. Osnovni snapshot je pomjeren u V1 radi sigurnog uvoza, a jednostavan Windows čitač ranije radi provjere prenosivosti.
+
+| **Izvor** | **Zahtjev** | **Faza i dokaz** |
+| --- | --- | --- |
+| 1 i 18 | Offline rad i vlasništvo nad podacima | 0, 3, 8; čista offline obnova |
+| 2 | AndroLLM ili zamjenjiva baza | 0–1; build i ugovori adaptera |
+| 3 i 20 | Alexa Identity/Core odvojen od modela | 1–2, 4, 9; zamjena LLM-a i prenos |
+| 4 | Lokalna memorija, ručni transfer, verzije i sync | 2–3, 9, 12; krug prenosa i konfliktni testovi |
+| 5 | Univerzalni Import/Export i automatski import | 3, 8; potpuni inventar i rollback |
+| 6 | Online katalog i lokalni modeli | 4; instalacija, validacija i zamjena |
+| 7 | Različiti LLM-ovi i učitavanje po potrebi | 4, 7, 9; profiliranje i zajednički identitet |
+| 8 | TTS, engine, voice i originalni glas | 0, 5, 10; offline glas i preview |
+| 9 | Zamjenjivi ASR | 0, 5; isti snimci na više kandidata |
+| 10 | Wake word i glasovne komande | 5, 8; detekcija, pozadina i zaključavanje |
+| 11 | Master i mobilna 3D varijanta | 0, 6; sačuvan master i uporedni prikaz |
+| 12 | Rig i osnovne animacije | 6–7; poze i povezivanje s govorom |
+| 13 | IK, proceduralni i budući AI pokret | 10; kontrolisani pokreti; zasebno istraživanje generisanja |
+| 14 | Unity URP i zamjenjiv avatar | 0–1, 6–7; mobilni prikaz i AvatarBridge |
+| 15 | Garderoba i sadržajni paketi | 3, 10; import i offline obnova outfita |
+| 16 | Vision, kamera i označavanje ekrana | 11; test koordinata, dozvola i prekida |
+| 17 | Karakter, raspoloženje i odnos | 2, 10; odvojena stanja i evaluacija |
+| 19 | V1 V2 V3 | 8, 10–11, 12; kriteriji izdavanja |
+| 21 | Prvi praktični rezultat | 0; master, mobilni test i mali AI lanac |
+
+# 17 Program rada i predaja između sesija
+
+## Jedna aktivna faza
+
+Svaka sesija počinje čitanjem statusa, aktivne faze i posljednje stabilne verzije. Izabere se jedan konkretan rezultat, uradi potreban posao i provjeri najbliži kriterij prihvata. Na kraju se upišu izmjene, dokazi, preostali problemi i tačan sljedeći korak. Ne tražiti od Viktora da rekonstruiše prethodne razgovore.
+
+Status faze može biti: nije započeta, u radu, čeka konkretan ulaz, ne prolazi provjeru ili završena. Za završenu fazu moraju postojati isporuka i rezultati provjere. Snimak lijepog ekrana ne zamjenjuje test memorije, a uspješan emulator ne zamjenjuje mjerenje na telefonu.
+
+## Trajni radni zapisi
+
+Glavni plan s verzijom i kratkim popisom izmjena.
+
+STATUS sa aktivnom fazom, trenutnom verzijom aplikacije, poznatim problemima i narednim zadatkom.
+
+ODLUKE sa izborima i dokazima; KOMPONENTE sa nazivima, revizijama, hash vrijednostima i licencama.
+
+TESTOVI sa scenarijima, uređajem, verzijama, ulazima, rezultatom i putanjom do dokaza.
+
+IZDANJA sa APK/desktop paketom, migracijom, kompatibilnošću i povratkom prethodne verzije.
+
+## Podjela posla
+
+Alexa/programer vodi tehničku analizu, implementaciju, poređenja, testove i bilješke. Viktor daje nedostupne ulazne fajlove, omogućava test na stvarnom uređaju kada je potreban i ocjenjuje glas i izgled. Rutinske tehničke odluke slijede ovaj plan bez novih krugova objašnjavanja. Odluka koja mijenja cilj ili traži kupovinu izdvaja se jasno i kratko.
+
+## Prvi naredni radni paket
+
+Početak implementacije je faza 0. Pripremiti konkretan AndroLLM checkout i build izvještaj, pribaviti 3D master, potvrditi uređaj i napraviti mali skup govora. Zatim izvesti odvojene i zajedničke testove, zaključiti bazu i objaviti dokaz izvodljivosti. Do tada ovaj dokument predstavlja dovršen plan razvoja, a ne tvrdnju da su tehničke provjere već prošle.
+
+Održiv raspored znači zatvaranje faza na osnovu dokaza. Specifikacija ostaje stabilna, dok se modeli, biblioteke i praktične postavke mijenjaju unutar već definisanih granica. Time se smanjuje potreba da svaka nova sesija ponovo započinje projektovanje cijelog sistema.
+
+# 18 Izvori i pouzdanost nalaza
+
+Pristupljeno 19. septembra 2026. Izvorni korisnički zahtjevi preuzeti su iz Mini_Alexa_FINALNE_biljeske_2026-09-19.txt. Web izvori potvrđuju opisane mogućnosti i ograničenja, ali ne predstavljaju naš test na uređaju. Vlastiti arhitektonski prijedlozi i kriteriji prihvata iz ovog plana označeni su kao preporuke ili početni ciljevi.
+
+**[1] AndroLLM repozitorij i README. **Format .litertlm, GGUF ograničenje, engleski voice lanac, memorija, arhitektura i deklarisana licenca. Dokumentacija ima interne nedosljednosti. [Otvori izvor](https://github.com/ShadowSafin/AndroLLM)
+
+**[2] AndroLLM službena stranica. **Navodi NPU kao planiran i opisuje postojeće funkcije; korištena za poređenje s README-om. [Otvori izvor](https://www.androllm.com/)
+
+**[3] AndroLLM katalog zavisnosti. **Pregled konfiguracije verzija i biblioteka. Sam pregled ne dokazuje da build prolazi. [Otvori izvor](https://github.com/ShadowSafin/AndroLLM/blob/main/gradle/libs.versions.toml)
+
+**[4] Unity as a Library. **Platforme, ograničenja ugrađenog prikaza i zadržana memorija nakon unload. [Otvori izvor](https://docs.unity3d.com/6000.0/Documentation/Manual/UnityasaLibrary.html)
+
+**[5] Android ograničenja pozadinskih servisa. **Pokretanje servisa s mikrofonom i while-in-use dozvole. [Otvori izvor](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start)
+
+**[6] Android MediaProjection. **Saglasnost po sesiji, upravljanje prikazom i prestanak sesije. [Otvori izvor](https://developer.android.com/media/grow/media-projection)
+
+**[7] SQLite Backup API. **Konzistentna sigurnosna kopija otvorene baze. [Otvori izvor](https://sqlite.org/backup.html)
+
+**[8] Android pristup dokumentima i folderima. **Sistemski odabir datoteka i pristup sadržaju. [Otvori izvor](https://developer.android.com/training/data-storage/shared/documents-files)
+
+**[9] llama.cpp. **Kandidat za GGUF inference; Android build i backendovi. [Otvori izvor](https://github.com/ggml-org/llama.cpp)
+
+**[10] whisper.cpp. **Offline ASR, višejezični modeli, Android i Windows podrška. [Otvori izvor](https://github.com/ggml-org/whisper.cpp)
+
+**[11] sherpa onnx dokumentacija. **Lokalni speech runtime i platformska integracija. [Otvori izvor](https://k2-fsa.github.io/sherpa/onnx/index.html)
+
+**[12] Unity Animation Rigging. **Rigging constraints i IK osnova. [Otvori izvor](https://docs.unity3d.com/Packages/com.unity.animation.rigging@1.2/manual/index.html)
+
+Dodatno: pregledan je spisak core modula u repozitoriju. Pokušaji čitanja zasebnih LICENSE i ROADMAP putanja nisu uspjeli; zato konačni audit checkouta ostaje u fazi 0. Nije potvrđen konkretan bosanski TTS model za ciljni telefon. Nema izmišljenih mjerenja niti zaključanog izbora glasa bez preslušavanja.
+
+19. septembar 2026.   |
