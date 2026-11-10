@@ -10,9 +10,12 @@ Alexa je identitet i ponašanje, a LLM, glas i model su zamjenjivi moduli.
 - Faza 2 (memorija): ugovor i memorija u RAM-u gotovi; SQLite dolazi u fazi 5.
 - Faza 3 (dozvole i sesije): gotova.
 - Faza 4 (model sloj): router, eskalacija, budžet, registar modela; cloud adapter i katalog za preuzimanje dolaze kasnije.
+- Faza 6 (paketi sadržaja, core): provjera manifesta i kontrolnih suma, zabrana izvršnog koda, identitet se ne pakuje, glas mora imati poznat izvor, nepoznat tip je neaktivan.
 - Faza 5 (glas, dio u core-u): ugovori za STT i TTS, dijeljenje na rečenice, turn i prekid, chat tok. Mikrofon, zvučnik i Android UI su još u planu.
 
-U `core/` ukupno 62 testa prolazi.
+U `core/` ukupno 79 testova prolazi.
+
+Android SDK nije dostupan iz ovog okruženja (`dl.google.com` je blokiran politikom), pa Android aplikacija još nije napravljena.
 
 Kotlin testovi se pokreću kompajlerom kotlinc 2.1.0 i JUnit konzolom (Gradle build
 još nije provjeren).
