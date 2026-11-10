@@ -18,9 +18,14 @@ class InMemoryMemoryStore : MemoryStore {
             .filter { it.conversationId == conversationId }
             .sortedBy { it.timeMillis }
 
-    override fun suggest(claim: String, sourceMessageIds: List<String>, timeMillis: Long): Memory {
+    override fun suggest(
+        claim: String,
+        sourceMessageIds: List<String>,
+        timeMillis: Long,
+        kind: MemoryKind,
+    ): Memory {
         requireSources(sourceMessageIds)
-        val memory = Memory(nextId(), claim, sourceMessageIds, MemoryStatus.SUGGESTED, null, timeMillis)
+        val memory = Memory(nextId(), claim, sourceMessageIds, MemoryStatus.SUGGESTED, null, timeMillis, kind)
         memoriesById[memory.id] = memory
         return memory
     }
@@ -43,7 +48,7 @@ class InMemoryMemoryStore : MemoryStore {
         memoriesById[oldMemoryId] = old.copy(status = MemoryStatus.CORRECTED)
         // izričita ispravka korisnika odmah je potvrđena
         val replacement = Memory(
-            nextId(), newClaim, sourceMessageIds, MemoryStatus.CONFIRMED, oldMemoryId, timeMillis,
+            nextId(), newClaim, sourceMessageIds, MemoryStatus.CONFIRMED, oldMemoryId, timeMillis, old.kind,
         )
         memoriesById[replacement.id] = replacement
         return replacement

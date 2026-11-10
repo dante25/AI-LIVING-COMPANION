@@ -10,6 +10,9 @@ package alexa.memory
  */
 enum class MemoryStatus { SUGGESTED, CONFIRMED, CORRECTED }
 
+/** Vrsta tvrdnje. Odnos se pamti, ne samo činjenice: šale, svađe, što joj smeta. */
+enum class MemoryKind { FACT, PREFERENCE, SHARED_MOMENT, CONFLICT, DISLIKE }
+
 data class Message(
     val id: String,
     val conversationId: String,
@@ -25,6 +28,7 @@ data class Memory(
     val status: MemoryStatus,
     val supersedes: String?,
     val timeMillis: Long,
+    val kind: MemoryKind = MemoryKind.FACT,
 )
 
 interface MemoryStore {
@@ -32,7 +36,12 @@ interface MemoryStore {
     fun addMessage(message: Message)
     fun messages(conversationId: String): List<Message>
 
-    fun suggest(claim: String, sourceMessageIds: List<String>, timeMillis: Long): Memory
+    fun suggest(
+        claim: String,
+        sourceMessageIds: List<String>,
+        timeMillis: Long,
+        kind: MemoryKind = MemoryKind.FACT,
+    ): Memory
     fun confirm(memoryId: String): Memory
     fun correct(oldMemoryId: String, newClaim: String, sourceMessageIds: List<String>, timeMillis: Long): Memory
     fun delete(memoryId: String)
