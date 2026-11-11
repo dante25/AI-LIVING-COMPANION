@@ -39,5 +39,8 @@ class AvatarCommandBus @Inject constructor() {
 /** Kratka potvrda koju Alexa ispiše u chatu nakon naredbe za lik. */
 fun avatarCommandReply(command: AvatarCommand): String = when (command) {
     AvatarCommand.COME_BACK -> "Evo me, vratila sam se."
+    AvatarCommand.SIT_DOWN -> "Evo, sjedam."
+    AvatarCommand.STAND_UP -> "Evo, ustala sam."
+    AvatarCommand.LEAN -> "Naslonila sam se."
     else -> "Evo, pomjerila sam se."
 }

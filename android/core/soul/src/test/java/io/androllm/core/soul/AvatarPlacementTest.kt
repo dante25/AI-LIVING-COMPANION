@@ -58,4 +58,20 @@ class AvatarPlacementTest {
         val result = AvatarPlacement.nudge(screen, current, AvatarCommand.MOVE_LEFT, avoid, step = 240f)
         assertEquals(160f, result.left, 0.001f)
     }
+
+    @Test fun recognizesSitStandAndLeanCommands() {
+        assertEquals(AvatarCommand.SIT_DOWN, parseAvatarCommand("Alexa, sjedni"))
+        assertEquals(AvatarCommand.SIT_DOWN, parseAvatarCommand("sjedi"))
+        assertEquals(AvatarCommand.SIT_DOWN, parseAvatarCommand("sjedni malo"))
+        assertEquals(AvatarCommand.STAND_UP, parseAvatarCommand("ustani"))
+        assertEquals(AvatarCommand.STAND_UP, parseAvatarCommand("digni se"))
+        assertEquals(AvatarCommand.STAND_UP, parseAvatarCommand("Alexa, stani!"))
+        assertEquals(AvatarCommand.LEAN, parseAvatarCommand("nasloni se"))
+        assertEquals(AvatarCommand.LEAN, parseAvatarCommand("osloni se na zid"))
+    }
+
+    @Test fun newCommandsMatchWholeWordsOnly() {
+        assertNull(parseAvatarCommand("idemo na autobusku stanicu"))
+        assertNull(parseAvatarCommand("kako si"))
+    }
 }

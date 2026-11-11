@@ -14,7 +14,15 @@ data class Rect(val left: Float, val top: Float, val right: Float, val bottom: F
 }
 
 /** Naredbe koje korisnik daje liku na ekranu. */
-enum class AvatarCommand { MOVE_AWAY, MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN, COME_BACK }
+enum class AvatarCommand {
+    MOVE_AWAY, MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN, COME_BACK,
+    /** "Sjedni": lik hoda do najbližeg sjedišta i sjeda. */
+    SIT_DOWN,
+    /** "Ustani": lik ustaje na istom mjestu. */
+    STAND_UP,
+    /** "Nasloni se": lik hoda do najbližeg ruba ekrana i naslanja se. */
+    LEAN,
+}
 
 /**
  * Prepoznaje naredbe poput "Alexa, miči se" ili "Alexa, miči guzicu" iz poruke.
@@ -24,7 +32,14 @@ fun parseAvatarCommand(text: String): AvatarCommand? {
     val t = text.lowercase()
         .replace('č', 'c').replace('ć', 'c').replace('š', 's').replace('ž', 'z').replace('đ', 'd')
     fun has(vararg words: String) = words.any { t.contains(it) }
+    // Cijele riječi, da "stani" ne prepozna "stanica".
+    fun hasWord(vararg words: String) = words.any {
+        Regex("(^|[^a-z])" + Regex.escape(it) + "($|[^a-z])").containsMatchIn(t)
+    }
     return when {
+        hasWord("sjedni", "sjedi", "sedni") -> AvatarCommand.SIT_DOWN
+        hasWord("ustani", "digni se", "stani") -> AvatarCommand.STAND_UP
+        hasWord("nasloni se", "osloni se") -> AvatarCommand.LEAN
         has("vrati se", "dodji", "dodji ovamo", "vrati se na") -> AvatarCommand.COME_BACK
         has("mici guz", "mici se", "skloni se", "makni se", "pomjeri se", "odmakni se", "smetas", "smeta mi") ->
             AvatarCommand.MOVE_AWAY

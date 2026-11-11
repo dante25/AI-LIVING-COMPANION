@@ -14,7 +14,12 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
+import io.androllm.core.soul.Facing
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 
 /**
  * Probni lik nacrtan kodom (stilizovana djevojka). Crta se u zamišljenom prostoru
@@ -23,7 +28,12 @@ import kotlin.math.min
 class PlaceholderAvatarRenderer : AvatarRenderer {
 
     @Composable
-    override fun Render(params: AvatarParams, expression: AvatarExpression, modifier: Modifier) {
+    override fun Render(
+        params: AvatarParams,
+        expression: AvatarExpression,
+        modifier: Modifier,
+        motion: AvatarMotionParams,
+    ) {
         Canvas(modifier = modifier) {
             val fit = min(size.width / DESIGN_W, size.height / DESIGN_H)
             val dx = (size.width - DESIGN_W * fit) / 2f
@@ -32,13 +42,89 @@ class PlaceholderAvatarRenderer : AvatarRenderer {
                 translate(dx, dy)
                 scale(fit, fit, pivot = Offset.Zero)
             }) {
-                drawAvatar(params, expression)
+                drawAvatar(params, expression, motion)
             }
         }
     }
 
-    private fun DrawScope.drawAvatar(p: AvatarParams, expression: AvatarExpression) {
+    private fun DrawScope.drawAvatar(p: AvatarParams, expression: AvatarExpression, motion: AvatarMotionParams) {
+        val sit = motion.sitAmount
+        val lean = motion.leanAmount
+        val facing = motion.facing
+        val side = facing == Facing.LEFT || facing == Facing.RIGHT
+        // Smjer prema kojem je lik okrenut / nagnut: -1 lijevo, 1 desno.
+        val dir = if (facing == Facing.LEFT) -1f else 1f
+        val theta = (motion.walkPhase * 2.0 * PI).toFloat()
+        val swing = if (motion.isWalking) sin(theta) else 0f
+        val bounce = if (motion.isWalking) -abs(swing) * 2f else 0f
+        val drop = SIT_DROP * sit
+
+        // Cijeli lik je smanjen da ispod haljine ima mjesta za noge.
+        withTransform({
+            scale(FIGURE_SCALE, FIGURE_SCALE, pivot = Offset(50f, 0f))
+        }) {
+            withTransform({
+                // Nagib prema rubu oko stopala, pa blagi pomak ka rubu.
+                rotate(dir * LEAN_DEGREES * lean, pivot = Offset(50f, FOOT_Y))
+                translate(dir * 5f * lean, 0f)
+                if (side) scale(0.82f, 1f, pivot = Offset(50f, 0f))
+            }) {
+                withTransform({ translate(0f, bounce + drop) }) {
+                    drawUpperBody(p, expression, facing, dir)
+                }
+                drawLegs(sit, swing, side, dir)
+                if (lean > 0.02f) drawLeaningArm(dir, lean, drop)
+            }
+        }
+    }
+
+    /** Noge: ravne kad stoji, savijene (koljena naprijed) kad sjedi, naizmjenično podizanje pri hodu. */
+    private fun DrawScope.drawLegs(sit: Float, swing: Float, side: Boolean, dir: Float) {
+        for (leg in intArrayOf(-1, 1)) {
+            val sign = leg.toFloat()
+            val x = 50f + sign * 8f
+            val hipY = LEG_TOP_Y + SIT_DROP * sit
+            // Podizanje stopala: lijeva noga kad je swing > 0, desna kad je < 0.
+            val lift = max(0f, swing * -sign) * 5f
+            val reach = if (side) swing * sign * 7f else 0f
+            val footX = x + reach
+            val footY = FOOT_Y - lift
+            val midY = (hipY + footY) / 2f
+            val kneeX = x + reach * 0.5f
+            val kneeY = midY + (hipY - midY) * sit
+            val path = Path().apply {
+                moveTo(x, hipY)
+                lineTo(kneeX, kneeY)
+                lineTo(footX, footY)
+            }
+            drawPath(path, SKIN, style = Stroke(width = 6f, cap = StrokeCap.Round))
+            if (sit > 0.05f) drawCircle(color = SKIN, radius = 4.5f * sit, center = Offset(kneeX, kneeY))
+            // Cipela: pomjerena ka smjeru gledanja u profilu.
+            val shoeShift = if (side) dir * 2f else 0f
+            drawOval(
+                color = SHOE,
+                topLeft = Offset(footX - 5f + shoeShift, footY - 2f),
+                size = Size(10f, 5f)
+            )
+        }
+    }
+
+    /** Ruka uz rub ekrana dok se lik naslanja. */
+    private fun DrawScope.drawLeaningArm(dir: Float, lean: Float, drop: Float) {
+        val shoulder = Offset(50f + dir * 20f, 100f + drop)
+        val hand = Offset(50f + dir * (20f + 14f * lean), 106f + drop)
+        drawLine(color = SKIN, start = shoulder, end = hand, strokeWidth = 6f, cap = StrokeCap.Round)
+    }
+
+    private fun DrawScope.drawUpperBody(
+        p: AvatarParams,
+        expression: AvatarExpression,
+        facing: Facing,
+        dir: Float
+    ) {
         val neck = Offset(50f, 88f)
+        val back = facing == Facing.BACK
+        val side = facing == Facing.LEFT || facing == Facing.RIGHT
 
         // Tijelo: lagano diše i njiše se.
         withTransform({
@@ -51,12 +137,14 @@ class PlaceholderAvatarRenderer : AvatarRenderer {
                 size = Size(52f, 40f),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
             )
-            drawRoundRect(
-                color = DRESS_LIGHT,
-                topLeft = Offset(38f, 94f),
-                size = Size(24f, 7f),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f, 4f)
-            )
+            if (!back) {
+                drawRoundRect(
+                    color = DRESS_LIGHT,
+                    topLeft = Offset(38f, 94f),
+                    size = Size(24f, 7f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f, 4f)
+                )
+            }
             drawRect(color = SKIN_SHADE, topLeft = Offset(44f, 80f), size = Size(12f, 18f))
         }
 
@@ -67,20 +155,42 @@ class PlaceholderAvatarRenderer : AvatarRenderer {
         }) {
             drawHairBack()
             drawOval(color = SKIN, topLeft = Offset(28f, 27f), size = Size(44f, 50f))
+            if (back) {
+                // Potiljak: kosa preko cijelog lica, bez očiju i usta.
+                drawOval(color = HAIR, topLeft = Offset(25f, 22f), size = Size(50f, 58f))
+                drawArc(
+                    color = HAIR_LIGHT,
+                    startAngle = 200f,
+                    sweepAngle = 60f,
+                    useCenter = false,
+                    topLeft = Offset(32f, 27f),
+                    size = Size(36f, 28f),
+                    style = Stroke(width = 2f, cap = StrokeCap.Round)
+                )
+            } else {
             drawHairFront()
-            drawCheeks(p.cheek)
-            drawEye(Offset(40f, 54f), p.eyeLOpen, p.eyeBallX, p.eyeBallY, expression)
-            drawEye(Offset(60f, 54f), p.eyeROpen, p.eyeBallX, p.eyeBallY, expression)
-            drawBrow(center = 40f, browY = p.browLY, mirror = false)
-            drawBrow(center = 60f, browY = p.browRY, mirror = true)
-            drawLine(
-                color = SKIN_SHADE,
-                start = Offset(50f, 59f),
-                end = Offset(51f, 62f),
-                strokeWidth = 1f,
-                cap = StrokeCap.Round
-            )
-            drawMouth(p.mouthOpenY, p.mouthForm)
+            // U profilu se crte lica pomjeraju na stranu i sužavaju.
+            withTransform({
+                if (side) {
+                    translate(dir * 9f, 0f)
+                    scale(0.65f, 1f, pivot = Offset(50f, 54f))
+                }
+            }) {
+                drawCheeks(p.cheek)
+                drawEye(Offset(40f, 54f), p.eyeLOpen, p.eyeBallX, p.eyeBallY, expression)
+                drawEye(Offset(60f, 54f), p.eyeROpen, p.eyeBallX, p.eyeBallY, expression)
+                drawBrow(center = 40f, browY = p.browLY, mirror = false)
+                drawBrow(center = 60f, browY = p.browRY, mirror = true)
+                drawLine(
+                    color = SKIN_SHADE,
+                    start = Offset(50f, 59f),
+                    end = Offset(51f, 62f),
+                    strokeWidth = 1f,
+                    cap = StrokeCap.Round
+                )
+                drawMouth(p.mouthOpenY, p.mouthForm)
+            }
+            }
         }
     }
 
@@ -235,6 +345,14 @@ class PlaceholderAvatarRenderer : AvatarRenderer {
     private companion object {
         const val DESIGN_W = 100f
         const val DESIGN_H = 120f
+        /** Smanjenje lika da stane i s nogama. */
+        const val FIGURE_SCALE = 0.78f
+        /** Visina na kojoj stoje stopala i tačka gdje počinju noge (u prostoru lika prije smanjenja). */
+        const val FOOT_Y = 150f
+        const val LEG_TOP_Y = 132f
+        /** Za koliko se tijelo spusti kad lik sjedne. */
+        const val SIT_DROP = 10f
+        const val LEAN_DEGREES = 10f
 
         val SKIN = Color(0xFFFFE3DA)
         val SKIN_SHADE = Color(0xFFF2C4BC)
@@ -252,5 +370,6 @@ class PlaceholderAvatarRenderer : AvatarRenderer {
         val LIP = Color(0xFFB5476B)
         val MOUTH_INSIDE = Color(0xFF8A2D4D)
         val TONGUE = Color(0xFFFF7FA8)
+        val SHOE = Color(0xFF5E2F80)
     }
 }

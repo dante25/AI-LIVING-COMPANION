@@ -166,3 +166,13 @@ raspona, ako se razlikuju od gornjih).
 
 Učitavanje modela (Cubism SDK ili Rive), pokretanje usta po zvuku glasa, izrazi iz duše, premještanje
 lika ("Alexa, miči se"), lebdenje iznad drugih aplikacija. To ostaje za sesiju koja radi na aplikaciji.
+
+## Realistične reference (od vlasnika)
+
+Folder `docs/avatar/referenca_realisticni/`:
+- `01_character_sheet.png`: lice, front, oba profila, leđa. Tamna valovita duga kosa, smeđe oči, zlatne naušnice s plavim kamenom i resicom, crveno sjajno odijelo sa rajsferšlusom do vrata, crvene čizme s visokom petom.
+- `02_stojeci_front.webp`: stav u mirovanju.
+- `03_`, `04_`: zalet i naslanjanje dlanovima na ekran (pogled odozgo/sprijeda).
+- `05_sjedi_na_podu_prst_na_podu.jpg`: **idle "dosadno"**: sjedi bočno na podu, oslonjena rukom, drugom rukom prstom dodiruje pod.
+
+Napomena: ovo su realistični renderi; ciljani izgled u aplikaciji ostaje stilizovan (toon), s istim bojama, frizurom, naušnicama i odijelom.

@@ -159,7 +159,7 @@ object AvatarMotionPlayer {
     private fun lerp(a: Point, b: Point, t: Float) = Point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
 
     /** Blago ubrzanje na početku i usporavanje na kraju, da hod ne izgleda mehanički. */
-    private fun easeInOut(t: Float): Float {
+    fun easeInOut(t: Float): Float {
         val c = t.coerceIn(0f, 1f)
         return c * c * (3f - 2f * c)
     }

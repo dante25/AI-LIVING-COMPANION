@@ -9,5 +9,10 @@ import androidx.compose.ui.Modifier
  */
 interface AvatarRenderer {
     @Composable
-    fun Render(params: AvatarParams, expression: AvatarExpression, modifier: Modifier)
+    fun Render(
+        params: AvatarParams,
+        expression: AvatarExpression,
+        modifier: Modifier,
+        motion: AvatarMotionParams = AvatarMotionParams.Idle,
+    )
 }
