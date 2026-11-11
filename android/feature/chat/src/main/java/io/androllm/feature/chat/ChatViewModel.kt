@@ -793,20 +793,19 @@ class ChatViewModel @Inject constructor(
                 )
             }
 
+            // Motor koristi SAMO PRVU sistemsku poruku (ostale odbacuje), pa se karakter,
+            // stanje duše, memorija, prilozi i spisak alata spajaju u jednu poruku.
+            val systemText = listOfNotNull(
+                persona.takeIf { it.isNotBlank() },
+                soulHint.takeIf { it.isNotBlank() },
+                memoryContext.systemText.takeIf { it.isNotBlank() },
+                attachmentContext.takeIf { it.isNotBlank() },
+                toolAdvertisement?.takeIf { it.isNotBlank() }
+            ).joinToString("\n\n")
+
             val messages = buildList {
-                // Alexin karakter i jezik uvijek idu prvi
-                add(ChatPromptMessage(role = "system", content = persona))
-                if (soulHint.isNotBlank()) {
-                    add(ChatPromptMessage(role = "system", content = soulHint))
-                }
-                if (memoryContext.systemText.isNotBlank()) {
-                    add(ChatPromptMessage(role = "system", content = memoryContext.systemText))
-                }
-                if (attachmentContext.isNotBlank()) {
-                    add(ChatPromptMessage(role = "system", content = attachmentContext))
-                }
-                toolAdvertisement?.let {
-                    add(ChatPromptMessage(role = "system", content = it))
+                if (systemText.isNotBlank()) {
+                    add(ChatPromptMessage(role = "system", content = systemText))
                 }
                 trimmedHistory.mapTo(this) {
                     ChatPromptMessage(
