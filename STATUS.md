@@ -23,10 +23,11 @@ Dokumenti: `PLAN_v2.md` (plan i odluke), `Mini_Alexa_*` (originalni planovi), `R
 
 ## Android aplikacija (prva verzija)
 
-APK: `build/apk/mini-alexa-debug.apk` (poslan kao fajl, nije u repou).
+APK: `build/apk/MiniAlexa-0.5.apk` (verzija 0.5, poslan kao fajl, nije u repou).
 
 - `app/`: ekran chata, unos tekstom i glasom (Android prepoznavanje govora), odgovor se čita naglas (Android TTS).
 - Memorija se čuva trajno na telefonu (SQLite). Dozvole u postavkama se pamte, a u sesiji važe samo dok je chat otvoren. Paketi se uvoze i čuvaju između pokretanja.
+- Katalog modela (`core/.../model/ModelCatalog.kt`): tri modela (lagani, srednji, jači). Preuzimanje s interneta traži uključen prekidač Internet i potvrdu. Sažeci nisu još provjereni, a huggingface.co nije bio dostupan iz sesije, pa linkove treba provjeriti pri prvom preuzimanju.
 - Odgovori su `RuleModel` (pravila iz stanja duše: raspoloženje, dosada, ljutnja). Nije jezički model. Pravi lokalni model je faza 7.
 - Build: `ANDROID_HOME=... KOTLINC=... ./scripts/build_apk.sh` → `build/apk/mini-alexa-debug.apk`.
 - Potpisan debug ključem, minSdk 26, targetSdk 35.

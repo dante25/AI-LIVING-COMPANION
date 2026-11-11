@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.ListView
@@ -12,8 +13,8 @@ import android.widget.Toast
 import java.io.File
 
 /**
- * Lokalni modeli: uvoz fajla i brisanje. Brisanje briše samo fajl modela.
- * Memorija i razgovori ostaju. Pokretanje modela još nije podržano.
+ * Lokalni modeli: preuzimanje iz kataloga, uvoz fajla i brisanje.
+ * Brisanje briše samo fajl modela. Memorija i razgovori ostaju.
  */
 class ModelsActivity : Activity() {
     private lateinit var storage: ModelStorage
@@ -28,7 +29,12 @@ class ModelsActivity : Activity() {
         storage = ModelStorage(File(filesDir, "models"))
 
         findViewById<Button>(R.id.action_button).apply {
+            text = getString(R.string.models_download)
+            setOnClickListener { startActivity(Intent(this@ModelsActivity, CatalogActivity::class.java)) }
+        }
+        findViewById<Button>(R.id.action_button_secondary).apply {
             text = getString(R.string.models_import)
+            visibility = View.VISIBLE
             setOnClickListener { pickModel() }
         }
 
@@ -37,7 +43,10 @@ class ModelsActivity : Activity() {
         adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, ArrayList<String>())
         list.adapter = adapter
         list.setOnItemClickListener { _, _, position, _ -> confirmDelete(files[position]) }
+    }
 
+    override fun onResume() {
+        super.onResume()
         reload()
     }
 
@@ -68,8 +77,7 @@ class ModelsActivity : Activity() {
         val name = uri.lastPathSegment?.substringAfterLast('/') ?: "model.bin"
         try {
             val copied = contentResolver.openInputStream(uri)?.use { storage.importStream(name, it) }
-            if (copied == null) toast("Model se ne može otvoriti")
-            else toast("Model uvezen: $name")
+            toast(if (copied == null) "Model se ne može otvoriti" else "Model uvezen: $name")
             reload()
         } catch (e: Exception) {
             toast("Uvoz nije uspio: ${e.message}")

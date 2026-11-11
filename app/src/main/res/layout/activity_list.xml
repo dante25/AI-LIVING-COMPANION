@@ -14,6 +14,13 @@
         android:layout_height="wrap_content"
         android:minHeight="56dp" />
 
+    <Button
+        android:id="@+id/action_button_secondary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="56dp"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/empty_text"
         android:layout_width="match_parent"

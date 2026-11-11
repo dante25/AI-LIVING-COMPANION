@@ -29,7 +29,9 @@
     <string name="memory_summary">Pregled, brisanje pojedinih tvrdnji i brisanje svega</string>
     <string name="packs_title">Uvezi paket</string>
     <string name="packs_summary">Odjeća, glas, animacija ili osobnost (zip s manifest.json)</string>
-    <string name="models_import">Uvezi model</string>
+    <string name="models_import">Uvezi fajl modela</string>
+    <string name="models_download">Preuzmi model</string>
+    <string name="catalog_title">Preuzimanje modela</string>
     <string name="models_none">Nema uvezenih modela.</string>
     <string name="memory_clear_all">Obriši sve razgovore i memoriju</string>
     <string name="memory_clear_confirm">Briše se cijela historija razgovora i sve tvrdnje. Ne može se vratiti.</string>

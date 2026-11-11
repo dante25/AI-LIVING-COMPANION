@@ -70,4 +70,7 @@ fi
 "$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass pass:android --key-pass pass:android \
   --out "$OUT/mini-alexa-debug.apk" "$OUT/aligned.apk"
 
-echo "Gotovo: $OUT/mini-alexa-debug.apk"
+VERSION="$(sed -n 's/.*android:versionName="\([^"]*\)".*/\1/p' "$MANIFEST" | head -1)"
+FINAL="$OUT/MiniAlexa-$VERSION.apk"
+mv "$OUT/mini-alexa-debug.apk" "$FINAL"
+echo "Gotovo: $FINAL"
