@@ -62,6 +62,7 @@ dependencies {
     implementation(project(":core:accessibility"))
     implementation(project(":core:mcp"))
     implementation(project(":core:soul"))
+    implementation(project(":feature:avatar"))
     implementation(project(":feature:voice"))
     implementation(project(":core:utils"))
     implementation(project(":engine"))

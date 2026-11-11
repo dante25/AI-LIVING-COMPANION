@@ -26,6 +26,13 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -57,6 +64,7 @@ import io.androllm.core.ui.theme.EmberRed
 import io.androllm.core.ui.theme.InkOnLamp
 import io.androllm.core.ui.theme.LampAmber
 import io.androllm.core.ui.theme.ledger
+import io.androllm.feature.chat.voice.VoiceInputState
 
 /**
  * The writing slip — the desk's composer. A parchment panel with a ruled
@@ -79,7 +87,10 @@ fun ComposeInputArea(
      * false the paperclip is removed entirely — no empty gap, the composer
      * row just holds the text field and the send capsule.
      */
-    showAttachButton: Boolean = true
+    showAttachButton: Boolean = true,
+    /** Push-to-talk state; the mic icon becomes a pulsing stop while recording. */
+    voiceState: VoiceInputState = VoiceInputState.Idle,
+    onMicClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -122,6 +133,29 @@ fun ComposeInputArea(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
+            val voiceStatus: String? = when (voiceState) {
+                is VoiceInputState.Recording -> {
+                    val secs = voiceState.elapsedMs / 1000L
+                    "Slušam... %d:%02d".format(secs / 60L, secs % 60L)
+                }
+                is VoiceInputState.Transcribing -> "Prepoznajem..."
+                is VoiceInputState.Downloading -> "Preuzimam model... ${(voiceState.progress * 100).toInt()}%"
+                else -> null
+            }
+            if (voiceStatus != null) {
+                Text(
+                    text = voiceStatus,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.ledger.deskInk,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                )
+                if (voiceState is VoiceInputState.Downloading) {
+                    LinearProgressIndicator(
+                        progress = { voiceState.progress },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                    )
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Bottom,
@@ -243,19 +277,37 @@ fun ComposeInputArea(
                     )
                 )
 
-                // Mic — a quiet marginal note.
-                if (text.isEmpty() && !isGenerating) {
+                // Mic — push-to-talk. While recording it pulses as a rose stop.
+                val voiceBusy = voiceState is VoiceInputState.Transcribing ||
+                    voiceState is VoiceInputState.Downloading
+                val voiceRecording = voiceState is VoiceInputState.Recording
+                if ((text.isEmpty() || voiceRecording || voiceBusy) && !isGenerating) {
+                    val pulse = rememberInfiniteTransition(label = "MicPulse")
+                    val pulseAlpha by pulse.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 0.45f,
+                        animationSpec = infiniteRepeatable(tween(650), RepeatMode.Reverse),
+                        label = "MicPulseAlpha"
+                    )
                     IconButton(
-                        onClick = {
-                            Toast.makeText(context, "Voice input coming soon", Toast.LENGTH_SHORT).show()
-                        },
+                        onClick = onMicClick,
+                        enabled = !voiceBusy,
                         modifier = Modifier.size(40.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "Voice input",
-                            tint = MaterialTheme.ledger.deskInk
-                        )
+                        if (voiceRecording) {
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = "Zaustavi snimanje",
+                                tint = Color(0xFFE0457B),
+                                modifier = Modifier.alpha(pulseAlpha)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = "Glasovni unos",
+                                tint = MaterialTheme.ledger.deskInk
+                            )
+                        }
                     }
                 }
 

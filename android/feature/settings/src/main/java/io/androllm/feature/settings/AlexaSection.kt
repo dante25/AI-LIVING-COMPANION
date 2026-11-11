@@ -1,5 +1,14 @@
 package io.androllm.feature.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import io.androllm.feature.avatar.AvatarOverlayService
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,6 +81,25 @@ fun AlexaSection(viewModel: AlexaViewModel = hiltViewModel()) {
     var draft by remember(settings.persona) { mutableStateOf(settings.persona) }
     var confirmReset by remember { mutableStateOf(false) }
     val dirty = draft.trim() != settings.persona.trim()
+
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var awaitingOverlayGrant by remember { mutableStateOf(false) }
+    // Povratak iz sistemskih postavki: ako je dozvola data, uključi lik preko drugih aplikacija.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && awaitingOverlayGrant) {
+                awaitingOverlayGrant = false
+                if (Settings.canDrawOverlays(context)) {
+                    viewModel.setOverlayEnabled(true)
+                    AvatarOverlayService.start(context)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val overlayOn = settings.overlayEnabled && Settings.canDrawOverlays(context)
 
     CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -179,6 +207,54 @@ fun AlexaSection(viewModel: AlexaViewModel = hiltViewModel()) {
                 Switch(
                     checked = settings.showAvatar,
                     onCheckedChange = { viewModel.setShowAvatar(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.ledger.lampGlow,
+                        checkedTrackColor = MaterialTheme.ledger.lampDeep,
+                        checkedBorderColor = MaterialTheme.ledger.lampDeep,
+                        uncheckedThumbColor = MaterialTheme.ledger.deskInk,
+                        uncheckedTrackColor = MaterialTheme.ledger.deskHairline,
+                        uncheckedBorderColor = MaterialTheme.ledger.deskHairline
+                    )
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Prikaži Alexu preko drugih aplikacija",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.ledger.deskPaper
+                        )
+                    )
+                    Text(
+                        text = "Alexa lebdi preko svih aplikacija i možeš je prevući prstom. Potrebna je dozvola \"Prikaz preko drugih aplikacija\"; ako je nemaš, otvorit će se postavke sistema.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.ledger.deskInk)
+                    )
+                }
+                Switch(
+                    checked = overlayOn,
+                    onCheckedChange = { on ->
+                        if (!on) {
+                            viewModel.setOverlayEnabled(false)
+                            AvatarOverlayService.stop(context)
+                        } else if (Settings.canDrawOverlays(context)) {
+                            viewModel.setOverlayEnabled(true)
+                            AvatarOverlayService.start(context)
+                        } else {
+                            awaitingOverlayGrant = true
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:" + context.packageName)
+                                )
+                            )
+                        }
+                    },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = MaterialTheme.ledger.lampGlow,
                         checkedTrackColor = MaterialTheme.ledger.lampDeep,

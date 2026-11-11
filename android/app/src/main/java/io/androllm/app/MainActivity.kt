@@ -9,12 +9,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import io.androllm.app.navigation.AppNavHost
 import io.androllm.core.datastore.PreferencesDataStore
 import io.androllm.core.models.ThemeMode
 import io.androllm.core.ui.theme.AndroLLMTheme
 import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 /**
  * Main activity hosting the Compose navigation graph.
@@ -33,6 +35,20 @@ class MainActivity : ComponentActivity() {
     /** Route requested by a voice command (e.g. "open settings"). */
     private var pendingRoute: String? = null
     private var pendingRouteSetter: ((String?) -> Unit)? = null
+
+    @Inject
+    lateinit var alexaSettingsStore: io.androllm.core.soul.AlexaSettingsStore
+
+    override fun onResume() {
+        super.onResume()
+        // Lik preko drugih aplikacija: pokreni servis ako je uključen i dozvola postoji.
+        lifecycleScope.launch {
+            val enabled = runCatching { alexaSettingsStore.current().overlayEnabled }.getOrDefault(false)
+            if (enabled && android.provider.Settings.canDrawOverlays(this@MainActivity)) {
+                runCatching { io.androllm.feature.avatar.AvatarOverlayService.start(this@MainActivity) }
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()

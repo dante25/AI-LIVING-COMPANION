@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -42,6 +43,11 @@ data class AlexaSettings(
     val soulEnabled: Boolean = true,
     val showAvatar: Boolean = true,
     val avatarSize: AvatarSize = AvatarSize.MEDIUM,
+    /** Lik se crta preko drugih aplikacija (sistemski prozor, potrebna dozvola). */
+    val overlayEnabled: Boolean = false,
+    /** Zadnje mjesto sistemskog lika (lijevi gornji ugao u px); -1 = podrazumijevano (gore desno). */
+    val overlayX: Int = -1,
+    val overlayY: Int = -1,
 ) {
     /** Karakter koji se zaista koristi. */
     val persona: String get() = personaOverride.ifBlank { DEFAULT_ALEXA_PERSONA }
@@ -59,6 +65,9 @@ class AlexaSettingsStore @Inject constructor(
         val SOUL_ENABLED = booleanPreferencesKey("soul_enabled")
         val SHOW_AVATAR = booleanPreferencesKey("show_avatar")
         val AVATAR_SIZE = stringPreferencesKey("avatar_size")
+        val OVERLAY_ENABLED = booleanPreferencesKey("overlay_enabled")
+        val OVERLAY_X = intPreferencesKey("overlay_x")
+        val OVERLAY_Y = intPreferencesKey("overlay_y")
     }
 
     private val dataStore: DataStore<Preferences> = context.alexaDataStore
@@ -69,6 +78,9 @@ class AlexaSettingsStore @Inject constructor(
             soulEnabled = prefs[Keys.SOUL_ENABLED] ?: true,
             showAvatar = prefs[Keys.SHOW_AVATAR] ?: true,
             avatarSize = AvatarSize.fromName(prefs[Keys.AVATAR_SIZE]),
+            overlayEnabled = prefs[Keys.OVERLAY_ENABLED] ?: false,
+            overlayX = prefs[Keys.OVERLAY_X] ?: -1,
+            overlayY = prefs[Keys.OVERLAY_Y] ?: -1,
         )
     }
 
@@ -81,6 +93,9 @@ class AlexaSettingsStore @Inject constructor(
             prefs[Keys.SOUL_ENABLED] = updated.soulEnabled
             prefs[Keys.SHOW_AVATAR] = updated.showAvatar
             prefs[Keys.AVATAR_SIZE] = updated.avatarSize.name
+            prefs[Keys.OVERLAY_ENABLED] = updated.overlayEnabled
+            prefs[Keys.OVERLAY_X] = updated.overlayX
+            prefs[Keys.OVERLAY_Y] = updated.overlayY
         }
     }
 }

@@ -92,6 +92,7 @@ class VoiceSettingsStore @Inject constructor(
         val TN_ABBREVIATIONS = booleanPreferencesKey("tn_abbreviations")
         val TN_DEBUG = booleanPreferencesKey("tn_debug")
         val READ_REPLIES_ALOUD = booleanPreferencesKey("read_replies_aloud")
+        val AUTO_SEND_SPEECH = booleanPreferencesKey("auto_send_speech")
     }
 
     private val dataStore: DataStore<Preferences> = context.voiceDataStore
@@ -184,7 +185,8 @@ class VoiceSettingsStore @Inject constructor(
         tnPhones = p[Keys.TN_PHONES] ?: VoiceSettings().tnPhones,
         tnAbbreviations = p[Keys.TN_ABBREVIATIONS] ?: VoiceSettings().tnAbbreviations,
         tnDebug = p[Keys.TN_DEBUG] ?: VoiceSettings().tnDebug,
-        readRepliesAloud = p[Keys.READ_REPLIES_ALOUD] ?: VoiceSettings().readRepliesAloud
+        readRepliesAloud = p[Keys.READ_REPLIES_ALOUD] ?: VoiceSettings().readRepliesAloud,
+        autoSendSpeech = p[Keys.AUTO_SEND_SPEECH] ?: VoiceSettings().autoSendSpeech
     )
 
     private fun wakePhrasesFrom(p: Preferences): String {
@@ -252,5 +254,6 @@ class VoiceSettingsStore @Inject constructor(
         p[Keys.TN_ABBREVIATIONS] = s.tnAbbreviations
         p[Keys.TN_DEBUG] = s.tnDebug
         p[Keys.READ_REPLIES_ALOUD] = s.readRepliesAloud
+        p[Keys.AUTO_SEND_SPEECH] = s.autoSendSpeech
     }
 }

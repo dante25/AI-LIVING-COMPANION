@@ -155,7 +155,8 @@ class ChatViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow<String>("")
     private val _isSearchOpen = MutableStateFlow<Boolean>(false)
     private val _debugInfo = MutableStateFlow<EngineDebugInfo?>(null)
-    private val _genConfig = MutableStateFlow(GenerationConfig())
+    // ALEXA: niža temperatura i uži izbor tokena sprečavaju da mali model skrene u kineski/japanski.
+    private val _genConfig = MutableStateFlow(GenerationConfig(temperature = 0.55f, topP = 0.9f, topK = 20))
 
     /** Cloud chat mode state (Local GGUF vs LiteLLM proxy). */
     private val _cloudMode = MutableStateFlow(false)
@@ -842,7 +843,8 @@ class ChatViewModel @Inject constructor(
                 soulHint.takeIf { it.isNotBlank() },
                 memoryContext.systemText.takeIf { it.isNotBlank() },
                 attachmentContext.takeIf { it.isNotBlank() },
-                toolAdvertisement?.takeIf { it.isNotBlank() }
+                toolAdvertisement?.takeIf { it.isNotBlank() },
+                ALEXA_LANGUAGE_RULE
             ).joinToString("\n\n")
 
             val messages = buildList {
@@ -2262,3 +2264,9 @@ private fun ChatMessage.toCoreMessage(): Message = Message(
 
 /** Gornja granica spiska alata u uputi (znakova). Manji spisak ostavlja više mjesta za razgovor. */
 private const val ALEXA_TOOL_AD_CAP_CHARS = 1200
+
+/** Zadnja linija uputstva (najjači utjecaj na mali model): samo bosanski, samo latinica. */
+private const val ALEXA_LANGUAGE_RULE =
+    "VAŽNO: odgovaraj ISKLJUČIVO na bosanskom jeziku, latiničnim pismom. " +
+    "Nikad ne koristi kineski, japanski, korejski, arapski, ćirilicu niti bilo koji drugi jezik ili pismo, " +
+    "čak i ako korisnik napiše nešto nejasno. Ako ne razumiješ, kratko pitaj na bosanskom."

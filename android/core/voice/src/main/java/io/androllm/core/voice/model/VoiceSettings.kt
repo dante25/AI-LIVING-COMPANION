@@ -112,7 +112,10 @@ data class VoiceSettings(
     val tnDebug: Boolean = false,
 
     /** Čitaj odgovore naglas u običnom chatu (nezavisno od glasovnog asistenta). */
-    val readRepliesAloud: Boolean = true
+    val readRepliesAloud: Boolean = true,
+
+    /** Automatski posalji prepoznati govor iz chata (push-to-talk). */
+    val autoSendSpeech: Boolean = true
 ) {
     companion object {
         const val MIN_SENSITIVITY = 0.1f

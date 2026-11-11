@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
+import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,7 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,7 +56,7 @@ private data class AvatarLayout(
 
 /**
  * Plutajući lik preko ekrana (Chat i Home). Stavlja se kao zadnje dijete u [Box] koji
- * pokriva ekran. Ne hvata dodire. Kad stigne naredba ("miči se", "sjedni", "nasloni se") ili
+ * pokriva ekran. Hvata samo dodire na samom liku (može se prevlačiti prstom). Kad stigne naredba ("miči se", "sjedni", "nasloni se") ili
  * tastatura zakloni lik, [AvatarMotionDirector] odredi cilj, [AvatarMotionPlanner] napravi plan
  * (ustani, okreni se, hodaj, sjedni/nasloni se), a host ga izvodi po frejmovima. Lik ne klizi.
  *
@@ -67,7 +72,10 @@ fun AvatarOverlayHost(
     viewModel: AvatarViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     if (!settings.showAvatar) return
+    // Sistemski lik preko drugih aplikacija je uključen: ne crtaj drugi lik u aplikaciji.
+    if (settings.overlayEnabled && Settings.canDrawOverlays(context)) return
 
     val params by viewModel.params.collectAsStateWithLifecycle()
     val expression by viewModel.expression.collectAsStateWithLifecycle()
@@ -115,6 +123,18 @@ fun AvatarOverlayHost(
             val steps = AvatarMotionDirector.planTo(cur, pose, facing, goal, motionConfig.timings)
             session = MotionSession(steps, Point(cur.left, cur.top), pose, facing, goal)
         }
+
+        // Korisnikovo prevlačenje prekida plan pokreta i postaje novo mjesto lika (unutar ekrana).
+        val dragHandler: (Offset) -> Unit = { delta ->
+            val l = latest
+            val cur = currentRect(l)
+            val x = (cur.left + delta.x).coerceIn(0f, (l.screen.right - l.width).coerceAtLeast(0f))
+            val y = (cur.top + delta.y).coerceIn(0f, (l.screen.bottom - l.height).coerceAtLeast(0f))
+            session = null
+            val m = visual?.motion ?: AvatarMotionParams.Idle
+            visual = AvatarVisual(Point(x, y), AvatarMotionParams.at(m.pose, m.facing))
+        }
+        val currentDrag by rememberUpdatedState(dragHandler)
 
         // Naredbe iz chata.
         LaunchedEffect(viewModel) {
@@ -176,6 +196,12 @@ fun AvatarOverlayHost(
                 .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
                 .width(avatarWidthDp)
                 .height(avatarHeightDp)
+                .pointerInput(Unit) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        currentDrag(dragAmount)
+                    }
+                }
                 .semantics { contentDescription = "Alexa" }
         ) {
             renderer.Render(params, expression, Modifier.fillMaxSize(), motion)
@@ -187,7 +213,7 @@ fun AvatarOverlayHost(
 private class AvatarVisual(val position: Point, val motion: AvatarMotionParams)
 
 /** Jedan plan pokreta. Običan razred (poređenje po referenci), pa svaki novi plan ponovo pokreće izvođenje. */
-private class MotionSession(
+internal class MotionSession(
     val steps: List<MotionStep>,
     val startPosition: Point,
     val startPose: AvatarPose,

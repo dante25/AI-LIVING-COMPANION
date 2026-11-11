@@ -48,6 +48,10 @@ class AlexaViewModel @Inject constructor(
         viewModelScope.launch { store.update { it.copy(showAvatar = show) } }
     }
 
+    fun setOverlayEnabled(enabled: Boolean) {
+        viewModelScope.launch { store.update { it.copy(overlayEnabled = enabled) } }
+    }
+
     fun setAvatarSize(size: AvatarSize) {
         viewModelScope.launch { store.update { it.copy(avatarSize = size) } }
     }

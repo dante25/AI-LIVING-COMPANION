@@ -146,6 +146,61 @@ fun ChatScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
     var inputMessageText by remember { mutableStateOf("") }
+
+    // Push-to-talk (core/voice pipeline); lives and dies with this screen.
+    val voiceVm: io.androllm.feature.chat.voice.ChatVoiceViewModel = hiltViewModel()
+    val voiceState by voiceVm.state.collectAsStateWithLifecycle()
+    val micPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            voiceVm.onMicPermissionGranted()
+            voiceVm.start()
+        } else {
+            android.widget.Toast.makeText(context, "Dozvola za mikrofon nije odobrena", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(voiceVm) {
+        voiceVm.transcripts.collect { t ->
+            val merged = if (inputMessageText.isBlank()) t.text else inputMessageText.trimEnd() + " " + t.text
+            if (t.autoSend) {
+                viewModel.sendMessage(merged)
+                inputMessageText = ""
+            } else {
+                inputMessageText = merged
+            }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(voiceState) {
+        val st = voiceState
+        if (st is io.androllm.feature.chat.voice.VoiceInputState.Error) {
+            android.widget.Toast.makeText(context, st.message, android.widget.Toast.LENGTH_SHORT).show()
+            voiceVm.dismiss()
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(voiceVm) {
+        onDispose { voiceVm.cancel() }
+    }
+    (voiceState as? io.androllm.feature.chat.voice.VoiceInputState.NeedsModel)?.let { needs ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { voiceVm.dismiss() },
+            text = {
+                androidx.compose.material3.Text(
+                    "Za govor treba model za prepoznavanje (oko ${needs.sizeMb} MB). Preuzmi?"
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { voiceVm.confirmDownload() }) {
+                    androidx.compose.material3.Text("Preuzmi")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { voiceVm.dismiss() }) {
+                    androidx.compose.material3.Text("Odustani")
+                }
+            }
+        )
+    }
     var renameDialogOpen by remember { mutableStateOf<Conversation?>(null) }
     var renameInputText by remember { mutableStateOf("") }
     var editPromptMsgOpen by remember { mutableStateOf<ChatMessage?>(null) }
@@ -544,7 +599,30 @@ fun ChatScreen(
                             // Capability-driven: the paperclip only exists for
                             // cloud models. Local models get a clean composer
                             // with no gap and no attachment affordance.
-                            showAttachButton = successState?.attachmentsSupported == true
+                            showAttachButton = successState?.attachmentsSupported == true,
+                            voiceState = voiceState,
+                            onMicClick = {
+                                if (voiceState is io.androllm.feature.chat.voice.VoiceInputState.Recording) {
+                                    voiceVm.stopRecording()
+                                } else {
+                                    scope.launch {
+                                        if (voiceVm.isMicBlockedByPolicy()) {
+                                            android.widget.Toast.makeText(
+                                                context, "Mikrofon je isključen u Postavkama",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                        } else if (androidx.core.content.ContextCompat.checkSelfPermission(
+                                                context, android.Manifest.permission.RECORD_AUDIO
+                                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                        ) {
+                                            voiceVm.onMicPermissionGranted()
+                                            voiceVm.start()
+                                        } else {
+                                            micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                        }
+                                    }
+                                }
+                            }
                         )
                     }
                     }
