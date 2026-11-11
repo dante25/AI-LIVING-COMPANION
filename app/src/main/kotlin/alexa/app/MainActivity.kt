@@ -138,6 +138,8 @@ class MainActivity : Activity() {
 
         input = EditText(this).apply {
             hint = "Napiši Alexi"
+            textSize = 18f
+            minHeight = 56.dp()
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
         val sendButton = Button(this).apply {
@@ -159,9 +161,12 @@ class MainActivity : Activity() {
             addView(micButton)
         }
 
+        // Android 15 crta aplikaciju ispod statusne i navigacione trake, pa glavni
+        // raspored mora da poštuje te trake, inače je unos skriven ispod njih.
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 32, 32, 32)
+            fitsSystemWindows = true
+            setPadding(24, 24, 24, 24)
             addView(topRow)
             addView(scroll)
             addView(inputRow)
@@ -330,6 +335,8 @@ class MainActivity : Activity() {
     private fun appendLine(line: String) {
         log.append(line + "\n\n")
     }
+
+    private fun Int.dp(): Int = (this * resources.displayMetrics.density).toInt()
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
