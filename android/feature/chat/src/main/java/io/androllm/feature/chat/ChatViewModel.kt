@@ -100,7 +100,8 @@ class ChatViewModel @Inject constructor(
     private val traceStore: ToolExecutionTraceStore,
     private val variableStore: AgentVariableStore,
     private val toolPromptBuilder: ToolPromptBuilder,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val soulEngine: io.androllm.core.soul.SoulEngine
 ) : BaseViewModel() {
 
     private val _currentConversationId = MutableStateFlow<String>("")
@@ -758,8 +759,11 @@ class ChatViewModel @Inject constructor(
             // block + tool advertisement + template framing) rather than a
             // fixed guess, so a large injected attachment can never silently
             // push the rendered prompt over nCtx after trimming.
+            // Duša: primijeni događaj iz poruke i vrijeme, pa odluči ponašanje za ovaj odgovor
+            val soulHint = soulEngine.promptHint(soulEngine.onUserMessage(routeQuery))
             val systemTokenOverhead = SYSTEM_TEMPLATE_FRAMING_TOKENS +
                 ChatHistoryTrimmer.estimateTokens(ALEXA_PERSONA) +
+                ChatHistoryTrimmer.estimateTokens(soulHint) +
                 ChatHistoryTrimmer.estimateTokens(memoryContext.systemText) +
                 (if (attachmentContext.isNotBlank()) ChatHistoryTrimmer.estimateTokens(attachmentContext) else 0) +
                 (toolAdvertisement?.let { ChatHistoryTrimmer.estimateTokens(it) } ?: 0)
@@ -779,6 +783,7 @@ class ChatViewModel @Inject constructor(
             val messages = buildList {
                 // Alexin karakter i jezik uvijek idu prvi
                 add(ChatPromptMessage(role = "system", content = ALEXA_PERSONA))
+                add(ChatPromptMessage(role = "system", content = soulHint))
                 if (memoryContext.systemText.isNotBlank()) {
                     add(ChatPromptMessage(role = "system", content = memoryContext.systemText))
                 }

@@ -61,6 +61,7 @@ dependencies {
     implementation(project(":core:attachments"))
     implementation(project(":core:cloud"))
     implementation(project(":core:tools"))
+    implementation(project(":core:soul"))
     implementation(project(":engine"))
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")

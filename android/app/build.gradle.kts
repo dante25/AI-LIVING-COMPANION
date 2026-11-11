@@ -142,6 +142,7 @@ dependencies {
     implementation(project(":core:cloud"))
     implementation(project(":core:telemetry"))
     implementation(project(":core:memory"))
+    implementation(project(":core:soul"))
     implementation(project(":core:voice"))
     implementation(project(":core:tools"))
     implementation(project(":core:accessibility"))

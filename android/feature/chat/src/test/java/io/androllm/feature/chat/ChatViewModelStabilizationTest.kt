@@ -144,7 +144,11 @@ class ChatViewModelStabilizationTest {
             traceStore,
             variableStore,
             toolPromptBuilder,
-            settingsRepository
+            settingsRepository,
+            io.androllm.core.soul.SoulEngine(object : io.androllm.core.soul.SoulStore {
+                override fun load(): io.androllm.core.soul.SoulSnapshot? = null
+                override fun save(snapshot: io.androllm.core.soul.SoulSnapshot) = Unit
+            })
         )
     }
 
