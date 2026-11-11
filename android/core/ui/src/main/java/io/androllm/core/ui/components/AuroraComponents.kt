@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -159,8 +160,8 @@ fun AuroraCapsuleButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    brush: Brush = Brush.verticalGradient(listOf(Color.White, Color(0xFFE8E8F0))),
-    contentColor: Color = Color(0xFF0B0B10),
+    brush: Brush = SolidColor(MaterialTheme.colorScheme.primary),
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
     icon: ImageVector? = Icons.AutoMirrored.Filled.ArrowForward,
     enabled: Boolean = true
 ) {
@@ -240,8 +241,8 @@ fun GlassChip(
     Row(
         modifier = modifier
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.07f))
-            .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), CircleShape)
             .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(7.dp)
@@ -255,7 +256,7 @@ fun GlassChip(
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium.copy(
-                color = Color.White.copy(alpha = 0.85f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                 fontWeight = FontWeight.SemiBold
             )
         )
