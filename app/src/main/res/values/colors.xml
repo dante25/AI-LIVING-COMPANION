@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="rose_primary">#E0457B</color>
+    <color name="rose_dark">#B82D5F</color>
+    <color name="rose_soft">#F8BBD0</color>
+    <color name="rose_surface">#FFF5F8</color>
+    <color name="rose_text">#4A2C3A</color>
+    <color name="rose_hint">#9C7D8C</color>
+</resources>

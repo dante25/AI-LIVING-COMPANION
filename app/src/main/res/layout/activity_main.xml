@@ -6,6 +6,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:fitsSystemWindows="true"
+    android:background="@drawable/bg_gradient"
     android:padding="12dp">
 
     <ScrollView
@@ -19,6 +20,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="17sp"
+            android:textColor="@color/rose_text"
+            android:lineSpacingExtra="4dp"
             android:padding="4dp" />
     </ScrollView>
 
@@ -44,14 +47,20 @@
             android:id="@+id/mic"
             android:layout_width="56dp"
             android:layout_height="56dp"
+            android:background="@drawable/bg_round_button"
             android:contentDescription="@string/action_speak"
+            android:padding="12dp"
+            android:tint="#FFFFFF"
             android:src="@android:drawable/ic_btn_speak_now" />
 
         <ImageButton
             android:id="@+id/send"
             android:layout_width="56dp"
             android:layout_height="56dp"
+            android:background="@drawable/bg_round_button"
             android:contentDescription="@string/action_send"
+            android:padding="12dp"
+            android:tint="#FFFFFF"
             android:src="@android:drawable/ic_menu_send" />
     </LinearLayout>
 </LinearLayout>

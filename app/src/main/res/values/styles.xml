@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ženska tema: roze boje, svijetla pozadina, roze naglasci za dugmad, prekidače i traku. -->
+    <style name="AlexaTheme" parent="@android:style/Theme.Material.Light">
+        <item name="android:colorPrimary">@color/rose_primary</item>
+        <item name="android:colorPrimaryDark">@color/rose_dark</item>
+        <item name="android:colorAccent">@color/rose_primary</item>
+        <item name="android:windowBackground">@color/rose_surface</item>
+        <item name="android:textColorPrimary">@color/rose_text</item>
+        <item name="android:textColorHint">@color/rose_hint</item>
+        <item name="android:textColorSecondary">@color/rose_hint</item>
+    </style>
+</resources>
