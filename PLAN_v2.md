@@ -43,6 +43,12 @@ telefonska verzija bude stabilna.
 - Memorija i razgovori se ne izvoze u pakete. Identitet export je zasebna, šifrovana funkcija.
 - Klonirani glasovi tuđih osoba se ne prave bez pristanka.
 
+**Modularnost i proširenja** (zahtjev korisnika)
+- Svaki podsistem je iza interfejsa: model, glas, memorija, dozvole, paketi, akcije, ponašanje.
+- Nova funkcija se registruje u `FeatureRegistry` i deklariše od kojih dozvola zavisi. Aktivna je samo ako su te dozvole uključene.
+- Proširenja su podaci ili kod iz core modula, nikad izvršni kod iz paketa.
+- Nova sposobnost ne mijenja postojeće module: dodaje se implementacija interfejsa i registracija.
+
 ## Faze
 
 | Faza | Šta | Prolaz |
