@@ -21,6 +21,10 @@
         declarations grant visibility to exactly what the tools need.
     -->
     <queries>
+        <!-- Sistemski TTS motori (AndroidSystemTtsEngine, izbor glasa Alexe). -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
         <!-- App detection & launching (AppIndex / AppLauncherTool). -->
         <intent>
             <action android:name="android.intent.action.MAIN" />

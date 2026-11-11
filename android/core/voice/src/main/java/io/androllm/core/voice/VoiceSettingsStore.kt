@@ -14,6 +14,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.androllm.core.voice.model.VoiceSettings
+import io.androllm.core.voice.tts.TtsEngineIds
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -50,6 +51,8 @@ class VoiceSettingsStore @Inject constructor(
         val LANGUAGE = stringPreferencesKey("language")
         val AUTO_LANG_DETECT = booleanPreferencesKey("auto_language_detection")
         val TTS_VOICE = stringPreferencesKey("tts_voice")
+        val TTS_ENGINE = stringPreferencesKey("tts_engine")
+        val SYSTEM_VOICE_NAME = stringPreferencesKey("system_voice_name")
         val SPEAKING_SPEED = floatPreferencesKey("speaking_speed")
         val PITCH = floatPreferencesKey("pitch")
         val VOLUME = floatPreferencesKey("volume")
@@ -123,6 +126,8 @@ class VoiceSettingsStore @Inject constructor(
         language = p[Keys.LANGUAGE] ?: "en",
         autoLanguageDetection = p[Keys.AUTO_LANG_DETECT] ?: true,
         ttsVoice = p[Keys.TTS_VOICE] ?: "Kore",
+        ttsEngine = TtsEngineIds.normalize(p[Keys.TTS_ENGINE]),
+        systemVoiceName = p[Keys.SYSTEM_VOICE_NAME] ?: "",
         speakingSpeed = (p[Keys.SPEAKING_SPEED] ?: VoiceSettings().speakingSpeed)
             .coerceIn(VoiceSettings.MIN_SPEED, VoiceSettings.MAX_SPEED),
         pitch = (p[Keys.PITCH] ?: VoiceSettings().pitch)
@@ -193,6 +198,8 @@ class VoiceSettingsStore @Inject constructor(
         p[Keys.LANGUAGE] = s.language
         p[Keys.AUTO_LANG_DETECT] = s.autoLanguageDetection
         p[Keys.TTS_VOICE] = s.ttsVoice
+        p[Keys.TTS_ENGINE] = TtsEngineIds.normalize(s.ttsEngine)
+        p[Keys.SYSTEM_VOICE_NAME] = s.systemVoiceName
         p[Keys.SPEAKING_SPEED] = s.speakingSpeed
         p[Keys.PITCH] = s.pitch
         p[Keys.VOLUME] = s.volume

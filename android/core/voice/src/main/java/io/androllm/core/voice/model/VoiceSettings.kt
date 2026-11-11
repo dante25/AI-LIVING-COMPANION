@@ -24,6 +24,10 @@ data class VoiceSettings(
     val autoLanguageDetection: Boolean = true,
     /** Gemini TTS voice name ("Kore", "Puck", "Fenrir", "Aoede", "Charon"). */
     val ttsVoice: String = "Kore",
+    /** TTS motor: "system" (Android TextToSpeech), "piper" (engleski offline) ili "gemini" (cloud). */
+    val ttsEngine: String = "system",
+    /** Naziv sistemskog glasa (Voice.getName()); prazno = automatski izbor (bs/hr/sr, pa en). */
+    val systemVoiceName: String = "",
     /** TTS speaking speed (0.5..2.0). */
     val speakingSpeed: Float = 1.0f,
     /** TTS pitch (0.5..1.5). */

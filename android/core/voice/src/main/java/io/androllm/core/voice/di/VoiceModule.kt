@@ -12,6 +12,7 @@ import io.androllm.core.voice.stt.WhisperSpeechRecognizer
 import io.androllm.core.voice.tts.OfflineTtsEngine
 import io.androllm.core.voice.tts.PiperSpeechSynthesizer
 import io.androllm.core.voice.tts.SpeechSynthesizer
+import io.androllm.core.voice.tts.SwitchingTtsEngine
 import io.androllm.core.voice.vad.SherpaVad
 import io.androllm.core.voice.vad.VoiceActivityDetector
 import io.androllm.core.voice.wakeword.OpenWakeWordEngine
@@ -39,7 +40,7 @@ abstract class VoiceModule {
 
     @Binds
     @Singleton
-    abstract fun bindOfflineTtsEngine(impl: PiperSpeechSynthesizer): OfflineTtsEngine
+    abstract fun bindOfflineTtsEngine(impl: SwitchingTtsEngine): OfflineTtsEngine
 
     @Binds
     @Singleton

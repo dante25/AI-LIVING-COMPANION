@@ -406,6 +406,7 @@ fun VoiceAssistantSection(
                         onUpdate(settings.copy(ttsVoice = next))
                     }
                 )
+                TtsVoicePickerSection(settings = settings, onUpdate = onUpdate)
                 ToggleRow(
                     icon = Icons.Filled.Speed,
                     title = "Low latency mode",
