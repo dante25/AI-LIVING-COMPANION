@@ -58,6 +58,36 @@ rig dovoljan za te poze. Odluka da li se avatar radi u 3D-u, kao 2,5D (Live2D) i
 vidi `STATUS.md`. Napomena za laptop sesiju: ako se bira 3D, treba provjeriti da model ima blendshape oblike lica
 (treptanje, usta A/O/E, osmijeh); na snimcima je lice vjerovatno samo tekstura, pa se oblici dodaju u Blenderu.
 
+
+## Odluka: 3D u realnom vremenu (Filament), model iz Tripo i Meshy
+
+Modeli su napravljeni na Tripo i Meshy (web alati za AI 3D), pa se mogu preuzeti u bilo kojem formatu.
+Odluka: avatar je 3D u realnom vremenu (Filament / SceneView, glTF), sa "toon" izgledom blizu ilustraciji.
+Ako se pokaže pretežak ili neprirodan, rezerva je 2,5D (Live2D). Aplikacija koristi `.glb`.
+
+### Šta preuzeti (spisak za vlasnika projekta)
+
+Za SVAKI od ovih fajlova izaberi format **GLB** (glTF binary) i **PBR teksture uključene**:
+
+1. **Osnovni model za telefon:** remeshovan na oko **10 do 15 hiljada trouglova**, teksture **2K** (2048), poza T ili A.
+   Naziv: `alexa_base.glb`. (Obje stranice imaju remesh / low-poly izvoz.)
+2. **Rigovan model** (auto-rig, humanoidni kosturi) sa **idle** animacijom: `alexa_rigged_idle.glb`.
+3. **Animacije** iz biblioteke animacija (svaka kao GLB, ili sve u jednom): hodanje, sjedenje, okret, ruke uz ekran
+   (naslanjanje), mahanje, smijeh/gestikulacija, spavanje/zijevanje. Nazivi: `anim_<naziv>.glb`.
+4. **Visoki kvalitet** (original, bez remesha) samo kao arhiva: `alexa_master.glb` (ne ide u aplikaciju).
+
+Veličina: GitHub web upload dozvoljava do 25 MB po fajlu; veći fajlovi se guraju iz lokalne sesije na laptopu.
+Spremiti u `docs/avatar/model/`. Aplikacija će iz njih uzimati `android/app/src/main/assets/avatar/alexa/alexa.glb`.
+
+### Šta treba dodati modelu (Blender, laptop sesija)
+
+- **Blendshape oblici lica:** treptanje (obje oči), usta A, O, E, zatvorena, osmijeh, tuga, obrve gore i dolje.
+  AI mreže ih nemaju. Ako ručno modelovanje oblika nije moguće, rezerva je lice kao zasebna tekstura sa varijantama
+  (oči otvorene/zatvorene, usta A/O/E) koju aplikacija mijenja.
+- **Materijali:** vratiti sjaj odijela (metallic/roughness) i kosu (alpha, dvostrana); na test snimcima su teksture izgubljene.
+- **Kosa straga:** pojednostaviti uvijene pramenove u ploče sa alpha teksturom da ne izgleda kao crvi i da lakše radi na telefonu.
+- **Imena kostiju:** standardna humanoidna (Hips, Spine, Head, LeftHand...), da animacije iz biblioteke rade bez prepravki.
+
 ## Ulaz
 
 - Ako postoji 3D model (generisani kandidat): u Blenderu ga renderuj u **odvojene slojeve** (vidi Slojevi).
