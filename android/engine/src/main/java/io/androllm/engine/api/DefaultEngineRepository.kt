@@ -283,6 +283,17 @@ class DefaultEngineRepository @Inject constructor(
                     }
                     is CoherenceResult.Fail -> {
                         android.util.Log.e(TAG, "SELF-TEST failed: ${probeResult.reason}")
+                        // ALEXA: pri izričitom izboru CPU-a nema rezervnog procesora, a samotest zna biti
+                        // lažno negativan (prazan odgovor probe, zagrijan telefon). Model
+                        // ostaje učitan, a greška se samo bilježi; stvarni razgovor pokazuje
+                        // da li radi. Rušenje učitanog CPU modela korisniku ništa ne donosi.
+                        if (requestedBackend == BackendType.CPU) {
+                            android.util.Log.w(
+                                TAG,
+                                "SELF-TEST failed on CPU (${probeResult.reason}) — keeping the model loaded"
+                            )
+                            return@runCatching
+                        }
                         teardownFailedModel(probeResult.reason)
                         if (autoMode && config.gpuLayers != 0) {
                             // AUTO MODE ONLY: the probed delegate produced
@@ -359,6 +370,8 @@ class DefaultEngineRepository @Inject constructor(
             android.util.Log.e(TAG, "Self-test probe stalled: no tokens within ${SELF_TEST_TIMEOUT_MS}ms")
             null
         } catch (e: Exception) {
+            // Ranije je ovdje greška bila tiho progutana ("model produced no output")
+            android.util.Log.e(TAG, "Self-test probe threw: ${e.javaClass.simpleName}: ${e.message}", e)
             null
         }
         if (probeStalled) {

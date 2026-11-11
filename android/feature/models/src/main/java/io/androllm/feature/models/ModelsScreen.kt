@@ -1811,7 +1811,7 @@ private fun BackendSelectorCard(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "AUTO picks the fastest accelerator on this device (NPU → GPU → CPU) with silent fallback.",
+                text = "AUTO koristi CPU (stabilno). NPU i GPU su brži, ali na nekim telefonima mogu srušiti aplikaciju, pa ih biraj ručno.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.ledger.deskInk
             )
