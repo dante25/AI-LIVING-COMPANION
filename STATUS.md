@@ -21,10 +21,19 @@ Ukupno: Python 15 testova, Kotlin 95 testova (provjereno kompajlerom kotlinc 2.1
 
 Dokumenti: `PLAN_v2.md` (plan i odluke), `Mini_Alexa_*` (originalni planovi), `README.md`.
 
+## Android aplikacija (prva verzija)
+
+- `app/`: ekran chata, unos tekstom i glasom (Android prepoznavanje govora), odgovor se čita naglas (Android TTS).
+- Model je `EchoModel` (placeholder, samo potvrđuje poruku). Pravi lokalni model je faza 7.
+- Build: `ANDROID_HOME=... KOTLINC=... ./scripts/build_apk.sh` → `build/apk/mini-alexa-debug.apk`.
+- Potpisan debug ključem, minSdk 26, targetSdk 35.
+- Nije pokrenut ni na emulatoru ni na telefonu.
+
 ## Nije urađeno
 
 **Blokirano okruženjem:**
-- Android SDK: `dl.google.com` je blokiran politikom (403). Zahtjev za dodavanje hosta je odbijen dva puta. Zato nema Android projekta, APK-a, emulatora ni testa na telefonu.
+- Android: SDK je instaliran nakon što je `dl.google.com` dodan u dozvoljene domene. APK se gradi skriptom `scripts/build_apk.sh`. Nije testiran na telefonu ni emulatoru.
+- Gradle: `downloads.gradle.org` je blokiran, pa se APK gradi bez Gradle-a. Gradle build nije podešen.
 - Gradle build: nije provjeren. Kotlin testovi su pokretani direktno kompajlerom.
 
 **Čeka tvoj unos:**
