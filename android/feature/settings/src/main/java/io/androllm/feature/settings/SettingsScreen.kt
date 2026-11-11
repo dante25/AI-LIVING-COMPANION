@@ -159,6 +159,11 @@ fun SettingsScreen(
     ) { uri -> viewModel.importMemories(uri) }
 
     val context = LocalContext.current
+    // Stvarna verzija aplikacije (ista kao u imenu APK-a), a ne tvrdo upisan broj
+    val appVersionName = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
+            .getOrNull() ?: "?"
+    }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var expandedGroup by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -762,7 +767,7 @@ fun SettingsScreen(
                     expanded = expandedGroup == SettingsGroup.About.name,
                     onToggle = { toggleGroup(SettingsGroup.About) },
                     visible = SettingsGroup.About.matches(searchQuery),
-                    subtitle = "3.0.0",
+                    subtitle = appVersionName,
                     reduceMotion = settings.reduceMotion
                 ) {
                     CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -770,7 +775,7 @@ fun SettingsScreen(
                             SettingRow(
                                 icon = Icons.Filled.Info,
                                 title = stringResource(R.string.settings_version),
-                                value = "3.0.0 (Cloud Intelligence)",
+                                value = appVersionName,
                                 onClick = {}
                             )
                             SettingRow(

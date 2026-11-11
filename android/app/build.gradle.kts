@@ -10,6 +10,12 @@ plugins {
 }
 
 import org.gradle.process.ExecOutput
+import java.util.Properties
+
+// Verzija dolazi iz version.properties (isti izvor za aplikaciju i ime APK-a)
+val versionProps = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}
 
 android {
     namespace = "io.androllm.app"
@@ -51,8 +57,8 @@ android {
         applicationId = "io.androllm.app"
         minSdk = 28
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.5"
+        versionCode = 100 + versionProps.getProperty("versionBuild").toInt()
+        versionName = "${versionProps.getProperty("versionMajor")}.${versionProps.getProperty("versionMinor")}.${versionProps.getProperty("versionBuild")}"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
