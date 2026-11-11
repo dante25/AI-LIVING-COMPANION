@@ -10,11 +10,13 @@ import kotlin.math.sqrt
 object SilenceDetector {
 
     /** RMS (0..1) above which a chunk counts as speech. */
-    const val SPEECH_RMS_THRESHOLD = 0.015f
+    const val SPEECH_RMS_THRESHOLD = 0.006f
     const val SILENCE_STOP_MS = 2000L
     const val MAX_RECORDING_MS = 30_000L
+    /** Ako se u ovom roku ne čuje govor, snimanje staje. */
+    const val NO_SPEECH_TIMEOUT_MS = 8_000L
 
-    enum class StopReason { SILENCE, MAX_DURATION }
+    enum class StopReason { SILENCE, MAX_DURATION, NO_SPEECH }
 
     data class State(
         val elapsedMs: Long = 0L,
@@ -46,6 +48,7 @@ object SilenceDetector {
     /** Non-null when recording should stop now. */
     fun stopReason(state: State): StopReason? = when {
         state.elapsedMs >= MAX_RECORDING_MS -> StopReason.MAX_DURATION
+        !state.speechDetected && state.elapsedMs >= NO_SPEECH_TIMEOUT_MS -> StopReason.NO_SPEECH
         state.speechDetected && state.silentMs >= SILENCE_STOP_MS -> StopReason.SILENCE
         else -> null
     }

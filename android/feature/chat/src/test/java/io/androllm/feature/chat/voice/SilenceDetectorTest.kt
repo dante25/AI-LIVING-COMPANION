@@ -12,7 +12,7 @@ class SilenceDetectorTest {
 
     @Test
     fun silence_before_speech_never_stops() {
-        val s = run(List(40) { 0.0f })
+        val s = run(List(20) { 0.0f })
         assertNull(SilenceDetector.stopReason(s))
     }
 
@@ -35,8 +35,14 @@ class SilenceDetectorTest {
     }
 
     @Test
-    fun max_duration_stops_even_without_speech() {
-        val s = run(List(150) { 0.0f })
+    fun no_speech_for_eight_seconds_stops() {
+        val s = run(List(40) { 0.0f })
+        assertEquals(SilenceDetector.StopReason.NO_SPEECH, SilenceDetector.stopReason(s))
+    }
+
+    @Test
+    fun max_duration_stops_during_continuous_speech() {
+        val s = run(List(150) { 0.1f })
         assertEquals(SilenceDetector.StopReason.MAX_DURATION, SilenceDetector.stopReason(s))
     }
 

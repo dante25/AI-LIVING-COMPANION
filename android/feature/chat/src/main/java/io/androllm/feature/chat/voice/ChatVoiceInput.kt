@@ -35,6 +35,7 @@ import kotlinx.coroutines.withContext
 sealed interface VoiceInputState {
     data object Idle : VoiceInputState
     data class Recording(val elapsedMs: Long, val level: Float) : VoiceInputState
+    data object Loading : VoiceInputState
     data object Transcribing : VoiceInputState
     data class NeedsModel(val sizeMb: Int) : VoiceInputState
     data class Downloading(val progress: Float) : VoiceInputState
@@ -49,6 +50,8 @@ data class VoiceTranscript(val text: String, val autoSend: Boolean)
  * (whisper), same pipeline as the voice assistant service. Owns its own scope;
  * call [release] when the owner goes away.
  */
+private const val TAG = "ChatVoiceInput"
+
 class ChatVoiceInput @Inject constructor(
     @ApplicationContext private val context: Context,
     private val recognizer: SpeechRecognizer,
@@ -88,7 +91,10 @@ class ChatVoiceInput @Inject constructor(
             try {
                 readAloudSpeaker.stop()
                 val settings = voiceSettingsStore.current()
-                val ready = runCatching { recognizer.ensureInitialized() }.getOrDefault(false)
+                _state.value = VoiceInputState.Loading
+                val ready = runCatching { recognizer.ensureInitialized() }
+                    .onFailure { android.util.Log.e(TAG, "ensureInitialized failed", it) }
+                    .getOrDefault(false)
                 if (!ready) {
                     _state.value = VoiceInputState.NeedsModel(defaultModel().let { (it.sizeBytes / (1024 * 1024)).toInt() })
                     return@launch
@@ -212,13 +218,16 @@ class ChatVoiceInput @Inject constructor(
             rec.release()
             recorder = null
 
+            android.util.Log.i(TAG, "recording ended: ${detector.elapsedMs}ms speech=${detector.speechDetected}")
             if (!detector.speechDetected) {
-                _state.value = VoiceInputState.Error("Nisam te čula, probaj ponovo")
+                _state.value = VoiceInputState.Error("Ne čujem govor. Provjeri mikrofon i govori glasnije")
                 return
             }
             _state.value = VoiceInputState.Transcribing
             val text = withContext(Dispatchers.Default) {
-                runCatching { session.finish().text.trim() }.getOrDefault("")
+                runCatching { session.finish().text.trim() }
+                    .onFailure { android.util.Log.e(TAG, "transcription failed", it) }
+                    .getOrDefault("")
             }
             if (text.isBlank()) {
                 _state.value = VoiceInputState.Error("Nisam te čula, probaj ponovo")

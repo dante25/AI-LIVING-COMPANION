@@ -138,6 +138,7 @@ fun ComposeInputArea(
                     val secs = voiceState.elapsedMs / 1000L
                     "Slušam... %d:%02d".format(secs / 60L, secs % 60L)
                 }
+                is VoiceInputState.Loading -> "Učitavam model za govor..."
                 is VoiceInputState.Transcribing -> "Prepoznajem..."
                 is VoiceInputState.Downloading -> "Preuzimam model... ${(voiceState.progress * 100).toInt()}%"
                 else -> null
@@ -279,6 +280,7 @@ fun ComposeInputArea(
 
                 // Mic — push-to-talk. While recording it pulses as a rose stop.
                 val voiceBusy = voiceState is VoiceInputState.Transcribing ||
+                    voiceState is VoiceInputState.Loading ||
                     voiceState is VoiceInputState.Downloading
                 val voiceRecording = voiceState is VoiceInputState.Recording
                 if ((text.isEmpty() || voiceRecording || voiceBusy) && !isGenerating) {

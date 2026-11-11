@@ -139,6 +139,9 @@ class AudioRecorder(
                 runCatching { record.stop() }
                 runCatching { record.release() }
                 audioRecord = null
+                // Ako je snimanje palo samo od sebe, potrošači kanala moraju dobiti kraj.
+                recording.set(false)
+                _chunks.close()
                 android.util.Log.i(
                     "AudioRecorder",
                     String.format(
