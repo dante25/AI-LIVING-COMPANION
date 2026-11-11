@@ -16,6 +16,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -31,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.androllm.core.soul.AvatarSize
 import io.androllm.core.soul.describe
 import io.androllm.core.ui.components.AlexaStateBars
 import io.androllm.core.ui.components.CloudGlassCard
@@ -151,6 +154,71 @@ fun AlexaSection(viewModel: AlexaViewModel = hiltViewModel()) {
                         uncheckedBorderColor = MaterialTheme.ledger.deskHairline
                     )
                 )
+            }
+
+            HorizontalDivider(color = MaterialTheme.ledger.deskHairline)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Prikaži lik Alexe",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.ledger.deskPaper
+                        )
+                    )
+                    Text(
+                        text = "Lik lebdi preko ekrana razgovora i početnog ekrana. Možeš joj reći \"Alexa, miči se\".",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.ledger.deskInk)
+                    )
+                }
+                Switch(
+                    checked = settings.showAvatar,
+                    onCheckedChange = { viewModel.setShowAvatar(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.ledger.lampGlow,
+                        checkedTrackColor = MaterialTheme.ledger.lampDeep,
+                        checkedBorderColor = MaterialTheme.ledger.lampDeep,
+                        uncheckedThumbColor = MaterialTheme.ledger.deskInk,
+                        uncheckedTrackColor = MaterialTheme.ledger.deskHairline,
+                        uncheckedBorderColor = MaterialTheme.ledger.deskHairline
+                    )
+                )
+            }
+
+            if (settings.showAvatar) {
+                Text(
+                    text = "Veličina lika",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.ledger.deskPaper
+                    )
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    AvatarSize.entries.forEach { size ->
+                        RadioButton(
+                            selected = settings.avatarSize == size,
+                            onClick = { viewModel.setAvatarSize(size) },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = MaterialTheme.ledger.lampDeep,
+                                unselectedColor = MaterialTheme.ledger.deskInk
+                            )
+                        )
+                        Text(
+                            text = size.label,
+                            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.ledger.deskPaper),
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                    }
+                }
             }
 
             HorizontalDivider(color = MaterialTheme.ledger.deskHairline)

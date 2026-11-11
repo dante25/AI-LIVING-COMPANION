@@ -104,7 +104,8 @@ class ChatViewModel @Inject constructor(
     private val soulEngine: io.androllm.core.soul.SoulEngine,
     private val sessionManager: io.androllm.core.permissions.SessionManager,
     private val readAloudSpeaker: io.androllm.core.voice.tts.ReadAloudSpeaker,
-    private val voiceSettingsStore: io.androllm.core.voice.VoiceSettingsStore
+    private val voiceSettingsStore: io.androllm.core.voice.VoiceSettingsStore,
+    private val avatarCommandBus: io.androllm.core.soul.AvatarCommandBus
 ) : BaseViewModel() {
 
     override fun onCleared() {
@@ -1040,6 +1041,18 @@ class ChatViewModel @Inject constructor(
                 conversationRepository.updateTitle(id, generateTitleFromMessage(trimmed))
                 android.util.Log.i(TAG, "MESSAGE PERSISTED id=${userMessage.id}")
 
+                // Naredba za lik ("Alexa, miči se") ne ide modelu: izvršava se odmah uz kratku potvrdu.
+                val avatarCommand = if (turnAttachments.isEmpty() && trimmed.length <= AVATAR_COMMAND_MAX_CHARS) {
+                    io.androllm.core.soul.parseAvatarCommand(trimmed)
+                } else {
+                    null
+                }
+                if (avatarCommand != null) {
+                    avatarCommandBus.send(avatarCommand)
+                    appendAssistantMessage(io.androllm.core.soul.avatarCommandReply(avatarCommand))
+                    return@launch
+                }
+
                 // A brand-new conversation never inherits stale rows from a previous
                 // conversation (_messages is cleared by the observer, but only
                 // asynchronously). For existing conversations, the DB observer may
@@ -1845,6 +1858,9 @@ class ChatViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "ChatViewModel"
+
+        /** Duže poruke nisu naredbe za lik, nego običan razgovor. */
+        private const val AVATAR_COMMAND_MAX_CHARS = 60
 
         /**
          * Floor for the outer local tool-planning budget (see [planBudgetMs]).

@@ -84,6 +84,7 @@ fun HomeScreen(
     val isLoading = uiState is UiState.Loading
 
     CloudAtmosphericBackground {
+      Box(modifier = Modifier.fillMaxSize()) {
         CloudAdaptiveNavigation(
             currentRoute = Routes.HOME,
             onTabSelected = { tab ->
@@ -269,6 +270,9 @@ fun HomeScreen(
             }
             }
         }
+        // Plutajući lik Alexe preko cijelog ekrana
+        io.androllm.feature.avatar.AvatarOverlayHost(bottomBarHeight = 80.dp)
+      }
     }
 }
 

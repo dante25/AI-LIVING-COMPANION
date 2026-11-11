@@ -40,6 +40,8 @@ const val DEFAULT_ALEXA_PERSONA =
 data class AlexaSettings(
     val personaOverride: String = "",
     val soulEnabled: Boolean = true,
+    val showAvatar: Boolean = true,
+    val avatarSize: AvatarSize = AvatarSize.MEDIUM,
 ) {
     /** Karakter koji se zaista koristi. */
     val persona: String get() = personaOverride.ifBlank { DEFAULT_ALEXA_PERSONA }
@@ -55,6 +57,8 @@ class AlexaSettingsStore @Inject constructor(
     private object Keys {
         val PERSONA = stringPreferencesKey("persona_override")
         val SOUL_ENABLED = booleanPreferencesKey("soul_enabled")
+        val SHOW_AVATAR = booleanPreferencesKey("show_avatar")
+        val AVATAR_SIZE = stringPreferencesKey("avatar_size")
     }
 
     private val dataStore: DataStore<Preferences> = context.alexaDataStore
@@ -63,6 +67,8 @@ class AlexaSettingsStore @Inject constructor(
         AlexaSettings(
             personaOverride = prefs[Keys.PERSONA] ?: "",
             soulEnabled = prefs[Keys.SOUL_ENABLED] ?: true,
+            showAvatar = prefs[Keys.SHOW_AVATAR] ?: true,
+            avatarSize = AvatarSize.fromName(prefs[Keys.AVATAR_SIZE]),
         )
     }
 
@@ -73,6 +79,8 @@ class AlexaSettingsStore @Inject constructor(
         dataStore.edit { prefs ->
             prefs[Keys.PERSONA] = updated.personaOverride
             prefs[Keys.SOUL_ENABLED] = updated.soulEnabled
+            prefs[Keys.SHOW_AVATAR] = updated.showAvatar
+            prefs[Keys.AVATAR_SIZE] = updated.avatarSize.name
         }
     }
 }

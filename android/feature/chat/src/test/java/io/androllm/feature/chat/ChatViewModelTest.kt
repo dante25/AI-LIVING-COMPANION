@@ -146,7 +146,8 @@ class ChatViewModelTest {
             }),
             io.androllm.core.permissions.SessionManager { System.currentTimeMillis() },
             mockk<io.androllm.core.voice.tts.ReadAloudSpeaker>(relaxed = true),
-            mockk<io.androllm.core.voice.VoiceSettingsStore>(relaxed = true)
+            mockk<io.androllm.core.voice.VoiceSettingsStore>(relaxed = true),
+            io.androllm.core.soul.AvatarCommandBus()
         )
     }
 

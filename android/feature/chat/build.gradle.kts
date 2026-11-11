@@ -63,6 +63,7 @@ dependencies {
     implementation(project(":core:tools"))
     implementation(project(":core:permissions"))
     implementation(project(":core:soul"))
+    implementation(project(":feature:avatar"))
     implementation(project(":core:voice"))
     implementation(project(":engine"))
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")

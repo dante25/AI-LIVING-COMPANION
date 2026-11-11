@@ -597,6 +597,9 @@ fun ChatScreen(
                             Icon(Icons.Default.ArrowDownward, contentDescription = "Scroll to bottom")
                         }
                     }
+
+                    // Plutajući lik Alexe; izbjegava tastaturu i traku za unos.
+                    io.androllm.feature.avatar.AvatarOverlayHost(bottomBarHeight = 96.dp)
                 }
             }
         }

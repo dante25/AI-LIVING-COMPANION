@@ -55,6 +55,7 @@ dependencies {
     implementation(project(":core:utils"))
     implementation(project(":core:telemetry"))
     implementation(project(":core:soul"))
+    implementation(project(":feature:avatar"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material3:material3-window-size-class")
     implementation("androidx.activity:activity-compose:1.9.2")

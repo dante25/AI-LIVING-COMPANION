@@ -164,6 +164,7 @@ dependencies {
     
     // Feature modules
     implementation(project(":feature:home"))
+    implementation(project(":feature:avatar"))
     implementation(project(":feature:chat"))
     implementation(project(":feature:models"))
     implementation(project(":feature:settings"))

@@ -17,6 +17,7 @@ class SoulEngine(
     private var lastText: String
     private var lastAction: SoulAction = SoulAction.RESPOND
     private val _stateFlow: MutableStateFlow<SoulState>
+    private val _actionFlow = MutableStateFlow(SoulAction.RESPOND)
 
     /** Postavke iz ekrana "Alexa": duša uključena i tekst karaktera (prazan = podrazumijevani). */
     @Volatile
@@ -38,6 +39,9 @@ class SoulEngine(
     /** Trenutno stanje kao tok, za ekrane koji ga prikazuju. */
     val stateFlow: StateFlow<SoulState> get() = _stateFlow.asStateFlow()
 
+    /** Zadnja odluka o ponašanju kao tok (za lik na ekranu). */
+    val actionFlow: StateFlow<SoulAction> get() = _actionFlow.asStateFlow()
+
     /** Primijeni postavke (poziva ih modul iz [AlexaSettingsStore]). */
     fun applySettings(settings: AlexaSettings) {
         enabled = settings.soulEnabled
@@ -51,6 +55,7 @@ class SoulEngine(
         lastContact = clock()
         lastText = ""
         lastAction = SoulAction.RESPOND
+        _actionFlow.value = lastAction
         _stateFlow.value = state
         store.save(SoulSnapshot(state, lastContact, lastText))
     }
@@ -74,6 +79,7 @@ class SoulEngine(
         lastContact = now
         lastText = text
         lastAction = decide(next, event)
+        _actionFlow.value = lastAction
         store.save(SoulSnapshot(state, lastContact, lastText))
         return lastAction
     }

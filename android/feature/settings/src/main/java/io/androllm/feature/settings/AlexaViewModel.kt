@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.androllm.core.soul.AlexaSettings
 import io.androllm.core.soul.AlexaSettingsStore
+import io.androllm.core.soul.AvatarSize
 import io.androllm.core.soul.DEFAULT_ALEXA_PERSONA
 import io.androllm.core.soul.SoulEngine
 import io.androllm.core.soul.SoulState
@@ -41,6 +42,14 @@ class AlexaViewModel @Inject constructor(
 
     fun setSoulEnabled(enabled: Boolean) {
         viewModelScope.launch { store.update { it.copy(soulEnabled = enabled) } }
+    }
+
+    fun setShowAvatar(show: Boolean) {
+        viewModelScope.launch { store.update { it.copy(showAvatar = show) } }
+    }
+
+    fun setAvatarSize(size: AvatarSize) {
+        viewModelScope.launch { store.update { it.copy(avatarSize = size) } }
     }
 
     fun resetSoul() {
