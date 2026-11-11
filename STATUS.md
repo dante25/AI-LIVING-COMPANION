@@ -31,6 +31,14 @@ APK: `android/app/build/outputs/apk/debug/app-debug.apk`. Verzija 0.5.
 
 Preuzimanje modela ne zavisi od dozvola. Ekstenzije se dodaju i preko MCP servera koji AndroLLM već ima.
 
+## Avatar: odluke i ponašanje (zabilježeno)
+
+- **Stil:** ilustrovan, visoke rezolucije, 2,5D (Live2D stil). Lakši za resurse i izradu od punog 3D-a. Alternativa za runtime: Rive. Unity i 3D (Filament) ostaju samo kao rezerva.
+- **Izrada modela:** korisnik ima na laptopu Blender, Live2D Cubism i Krita. Odavde ne mogu da ih pokrenem; treba sesija na laptopu (vidi niže).
+- **Pokreti iz duše:** izraz lica i držanje dolaze iz stanja duše; usta prate zvuk Alexinog glasa (PCM iz TTS-a); treptanje, disanje, praćenje.
+- **"Alexa, miči se" (miči guzicu, makni se, smetaš mi):** lik se premješta na drugo mjesto na ekranu koje ne zaklanja tastaturu ni polje za unos. Prepoznavanje naredbe i biranje mjesta su gotovi u `core/soul` (`AvatarPlacement.kt`, testirano). Prikaz lika i prepoznavanje tastature u drugim aplikacijama (servis pristupačnosti) dolaze s avatarom.
+- Slične naredbe: idi lijevo/desno/gore/dolje, vrati se.
+
 ## Nije urađeno (po redu)
 
 1. **Optimizacija i stabilnost:** veličina APK-a (oko 278 MB), pokretanje, memorija, rezervni izbor modela.
