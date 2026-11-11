@@ -48,6 +48,16 @@ pozu, što Live2D rig sa jednog crteža ne može. Zato mješoviti pristup:
 - **Šake i prsti:** posebni slojevi po šaci (dlan, svaki prst ili grupa), jer se pozdravlja i naslanja.
 - **Veličina na telefonu:** lik se na ekranu prikazuje oko trećine visine; ne pretjerivati s brojem mesheva.
 
+
+### 3D test modeli (postoje)
+
+U `docs/avatar/referenca_3d/` su snimci ekrana 3D modela koje je vlasnik već napravio i probao: pogled straga, sa strane,
+spreda (T poza i poza pod uglom) i tri test snimka u kojima model, bez tekstura odijela i kose, radi pozu
+"ruke podignute uz ekran" (straga, sa strane, spreda). Model je generisan AI alatom (pisalo na snimcima) i ima
+rig dovoljan za te poze. Odluka da li se avatar radi u 3D-u, kao 2,5D (Live2D) ili miješano još nije donesena;
+vidi `STATUS.md`. Napomena za laptop sesiju: ako se bira 3D, treba provjeriti da model ima blendshape oblike lica
+(treptanje, usta A/O/E, osmijeh); na snimcima je lice vjerovatno samo tekstura, pa se oblici dodaju u Blenderu.
+
 ## Ulaz
 
 - Ako postoji 3D model (generisani kandidat): u Blenderu ga renderuj u **odvojene slojeve** (vidi Slojevi).
