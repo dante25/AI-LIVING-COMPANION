@@ -38,17 +38,10 @@ object BackendSelector {
         model: Model
     ): List<InferenceBackend> {
         val chain = when (preference) {
-            BackendType.AUTO -> buildList {
-                val npuVendor = NpuVendor.detect(
-                    socManufacturer = caps.npuVendor
-                )
-                if (caps.npuUsable && model.supportsNpu) {
-                    add(InferenceBackend.NpuBackend(npuVendor))
-                }
-                if (model.supportsGpu) {
-                    add(InferenceBackend.GpuBackend)
-                }
-            }
+            // ALEXA: AUTO je siguran režim: samo CPU. Pad native NPU/GPU biblioteke
+            // ruši cijeli proces i rezervni prelazak na CPU nikad ne dođe na red.
+            // NPU i GPU se koriste samo kad ih korisnik izričito izabere.
+            BackendType.AUTO -> emptyList()
             // Explicit requests are EXCLUSIVE: exactly one candidate. If it
             // cannot initialize, the failure surfaces to the user instead of
             // a silent delegate swap (spec: never fall back behind their back).
@@ -84,22 +77,15 @@ object BackendSelector {
      * NPU when usable + model-supported, else GPU when model-supported, else
      * CPU. Used for capability reporting and status pills.
      */
-    fun resolveAuto(caps: BackendCapabilities, model: Model): BackendType = when {
-        caps.npuUsable && model.supportsNpu -> BackendType.NPU
-        model.supportsGpu -> BackendType.GPU
-        else -> BackendType.CPU
-    }
+    fun resolveAuto(caps: BackendCapabilities, model: Model): BackendType = BackendType.CPU
 
     /**
      * The best backend this DEVICE can run (ignoring the model) — NPU when the
      * probe says it is usable, else GPU. Drives the default preference for a
      * fresh install and the \"Auto\" chip label.
      */
-    fun bestAvailable(caps: BackendCapabilities): BackendType = when {
-        caps.npuUsable -> BackendType.NPU
-        caps.gpuAvailable -> BackendType.GPU
-        else -> BackendType.CPU
-    }
+    // ALEXA: podrazumijevano je CPU (stabilno). NPU/GPU samo na izričit izbor.
+    fun bestAvailable(caps: BackendCapabilities): BackendType = BackendType.CPU
 
     /**
      * Memory-aware backend choice: prefers the backend that fits best in
