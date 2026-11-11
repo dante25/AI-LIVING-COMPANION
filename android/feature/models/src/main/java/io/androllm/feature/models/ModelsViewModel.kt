@@ -414,6 +414,52 @@ class ModelsViewModel @Inject constructor(
         }
     }
 
+    // ---- Recommended (curated) models: see RecommendedModels.kt ----
+    private val _recommendedResolving = MutableStateFlow<Set<String>>(emptySet())
+    val recommendedResolving: StateFlow<Set<String>> = _recommendedResolving.asStateFlow()
+    private val _recommendedErrors = MutableStateFlow<Map<String, String>>(emptyMap())
+    val recommendedErrors: StateFlow<Map<String, String>> = _recommendedErrors.asStateFlow()
+
+    /**
+     * Starts the download of a curated model through the same DownloadManager
+     * path as [downloadModel]. The repo file list is fetched first so a wrong
+     * file name falls back to the first `.litertlm` of the repo; any failure
+     * becomes a readable message in [recommendedErrors], never a crash.
+     */
+    fun downloadRecommended(rec: RecommendedModel) {
+        if (rec.id in _recommendedResolving.value) return
+        viewModelScope.launch {
+            _recommendedResolving.update { it + rec.id }
+            _recommendedErrors.update { it - rec.id }
+            try {
+                val files = repositoryRegistry.huggingFaceRepository.listRepoFileNames(rec.repo)
+                val fileName = RecommendedModels.pickLiteRtFile(rec, files)
+                if (fileName == null) {
+                    setRecommendedError(
+                        rec,
+                        "U repozitoriju ${rec.repo} nema .litertlm fajla. Pokušaj drugi model ili pretraži Hugging Face."
+                    )
+                } else {
+                    downloadManager.startDownload(RecommendedModels.toModel(rec, fileName))
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                setRecommendedError(
+                    rec,
+                    "Ne mogu dohvatiti ${rec.displayName} sa Hugging Face-a. Provjeri internet vezu; " +
+                        "moguće je i da je repozitorij ${rec.repo} preimenovan ili uklonjen."
+                )
+            } finally {
+                _recommendedResolving.update { it - rec.id }
+            }
+        }
+    }
+
+    private fun setRecommendedError(rec: RecommendedModel, message: String) {
+        _recommendedErrors.update { it + (rec.id to message) }
+    }
+
     fun updateSortOption(option: ModelSortOption) {
         _sortOption.value = option
     }

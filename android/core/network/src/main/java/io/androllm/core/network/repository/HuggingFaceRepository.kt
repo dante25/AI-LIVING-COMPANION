@@ -68,6 +68,13 @@ class HuggingFaceRepository @Inject constructor(
         emit(result)
     }
 
+    /**
+     * Lists every file name (`rfilename`) of the repo [modelId] on the Hub.
+     * Throws on network/HTTP/parse failure; callers are expected to catch.
+     */
+    suspend fun listRepoFileNames(modelId: String): List<String> =
+        api.getModelDetails(modelId).siblings.orEmpty().map { it.rfilename }
+
     override fun getReadme(modelId: String): Flow<Result<String>> = flow {
         val result = io.androllm.core.common.runCatching {
             api.getReadmeText(modelId)

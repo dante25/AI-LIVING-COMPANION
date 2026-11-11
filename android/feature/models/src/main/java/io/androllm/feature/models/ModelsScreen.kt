@@ -382,41 +382,24 @@ private fun InstalledModelsTab(
         data.installedModels.filter { it.isDownloaded }
     }
 
+    val recommendedResolving by viewModel.recommendedResolving.collectAsStateWithLifecycle()
+    val recommendedErrors by viewModel.recommendedErrors.collectAsStateWithLifecycle()
+    val deviceRamGb = data.hardwareInfo?.totalRamGb
+
     if (installedOnly.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Memory,
-                    contentDescription = null,
-                    tint = MaterialTheme.ledger.deskInk,
-                    modifier = Modifier.size(48.dp)
-                )
-                Text(
-                    text = "No Installed LiteRT Models",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Import a local .litertlm / .tflite file from storage or download from the Catalog.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.ledger.deskInk
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = onImportClick) {
-                    Icon(Icons.Default.Folder, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Import LiteRT Model")
-                }
-            }
-        }
+        RecommendedEmptyState(
+            installedModels = data.installedModels,
+            resolvingIds = recommendedResolving,
+            errors = recommendedErrors,
+            deviceRamGb = deviceRamGb,
+            listState = listState,
+            observeProgress = { viewModel.downloadManager.observeProgress(it) },
+            onDownload = { viewModel.downloadRecommended(it) },
+            onPause = { viewModel.pauseDownload(it) },
+            onResume = { viewModel.resumeDownload(it) },
+            onCancel = { viewModel.cancelDownload(it) },
+            onImportClick = onImportClick
+        )
     } else {
         LazyColumn(
             state = listState,
@@ -425,6 +408,18 @@ private fun InstalledModelsTab(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            recommendedModelsItems(
+                installedModels = data.installedModels,
+                resolvingIds = recommendedResolving,
+                errors = recommendedErrors,
+                deviceRamGb = deviceRamGb,
+                observeProgress = { viewModel.downloadManager.observeProgress(it) },
+                onDownload = { viewModel.downloadRecommended(it) },
+                onPause = { viewModel.pauseDownload(it) },
+                onResume = { viewModel.resumeDownload(it) },
+                onCancel = { viewModel.cancelDownload(it) }
+            )
+
             // Execution Backend — adaptive selector. The NPU option appears
             // ONLY when the startup probe found a usable NPU delegate on this
             // device (silent NPU support: no NPU ⇒ no NPU option, exactly like
