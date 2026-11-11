@@ -3,13 +3,10 @@ package alexa.app
 import alexa.chat.ChatPipeline
 import alexa.memory.InMemoryMemoryStore
 import alexa.model.BudgetGuard
-import alexa.model.LlmAdapter
 import alexa.model.Location
 import alexa.model.ModelRouter
 import alexa.model.ModelSettings
-import alexa.model.Reply
-import alexa.model.Request
-import alexa.model.Tier
+import alexa.model.RuleModel
 import alexa.soul.SoulState
 import alexa.voice.AudioChunk
 import alexa.voice.SpeechSynthesizer
@@ -32,7 +29,7 @@ import java.util.Locale
  * odgovor se čita naglas Android TTS-om, a glas se prepoznaje Android
  * prepoznavanjem govora (push-to-talk).
  *
- * Model je zasad EchoModel (placeholder). Pravi lokalni model dolazi u fazi 7.
+ * Odgovori su pravila iz stanja duše (RuleModel). Pravi jezički model dolazi u fazi 7.
  */
 class MainActivity : Activity() {
     private lateinit var log: TextView
@@ -52,12 +49,13 @@ class MainActivity : Activity() {
             }
         }
 
+        val soul = SoulState()
         val router = ModelRouter(
-            listOf(EchoModel()),
+            listOf(RuleModel(soul)),
             ModelSettings(Location.LOCAL, Location.LOCAL),
             BudgetGuard(1000),
         )
-        chat = ChatPipeline("glavni", SoulState(), InMemoryMemoryStore(), router, TtsSynth(), TurnManager())
+        chat = ChatPipeline("glavni", soul, InMemoryMemoryStore(), router, TtsSynth(), TurnManager())
 
         log = TextView(this).apply { textSize = 16f }
         val scroll = ScrollView(this).apply {
@@ -140,16 +138,5 @@ class MainActivity : Activity() {
 
     companion object {
         private const val REQUEST_SPEECH = 1
-    }
-}
-
-/** Placeholder model: vraća potvrdu poruke. Zamjenjuje se pravim lokalnim modelom. */
-class EchoModel : LlmAdapter {
-    override val tier: Tier = Tier.WEAK
-    override val location: Location = Location.LOCAL
-
-    override fun generate(request: Request): Reply {
-        val last = request.messages.lastOrNull()?.removePrefix("user: ") ?: ""
-        return Reply("Čujem te: $last", null, 1)
     }
 }

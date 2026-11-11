@@ -17,7 +17,7 @@ Zadnje ažuriranje: 2026-11-10. Grana: `claude/eager-archimedes-366atg`.
 | 9 Akcije | Aplikacije, pretraga i slanje prolaze kroz dozvole i potvrdu; neuspjeh se prijavljuje kao neuspjeh | `core/.../actions/` | dio od 95 |
 | 10 Autonomno ponašanje (pravila) | Spava, sjeda, zaleti se na ekran ili miruje, prema stanju duše; namjere samo iz dozvoljene liste | `core/.../behavior/` | dio od 95 |
 
-Ukupno: Python 15 testova, Kotlin 100 testova (provjereno kompajlerom kotlinc 2.1.0 i JUnit konzolom).
+Ukupno: Python 15 testova, Kotlin 106 testova (provjereno kompajlerom kotlinc 2.1.0 i JUnit konzolom).
 
 Dokumenti: `PLAN_v2.md` (plan i odluke), `Mini_Alexa_*` (originalni planovi), `README.md`.
 
@@ -26,7 +26,7 @@ Dokumenti: `PLAN_v2.md` (plan i odluke), `Mini_Alexa_*` (originalni planovi), `R
 APK: `build/apk/mini-alexa-debug.apk` (poslan kao fajl, nije u repou).
 
 - `app/`: ekran chata, unos tekstom i glasom (Android prepoznavanje govora), odgovor se čita naglas (Android TTS).
-- Model je `EchoModel` (placeholder, samo potvrđuje poruku). Pravi lokalni model je faza 7.
+- Odgovori su `RuleModel` (pravila iz stanja duše: raspoloženje, dosada, ljutnja). Nije jezički model. Pravi lokalni model je faza 7.
 - Build: `ANDROID_HOME=... KOTLINC=... ./scripts/build_apk.sh` → `build/apk/mini-alexa-debug.apk`.
 - Potpisan debug ključem, minSdk 26, targetSdk 35.
 - Nije pokrenut ni na emulatoru ni na telefonu.
