@@ -49,7 +49,8 @@ class ChatPipeline(
         soul.onEvent(kind)
         val decision = decide(soul, kind)
 
-        memory.addMessage(Message("u-$turnId", conversationId, "user", userText, now))
+        // id mora biti jedinstven i nakon ponovnog pokretanja, pa se uključuje vrijeme
+        memory.addMessage(Message("u-$now-$turnId", conversationId, "user", userText, now))
 
         val replyText = if (decision.action == "respond") {
             askModel()
@@ -57,7 +58,7 @@ class ChatPipeline(
             FIXED_REPLIES[decision.action] ?: FALLBACK_REPLY
         }
 
-        memory.addMessage(Message("a-$turnId", conversationId, "alexa", replyText, now))
+        memory.addMessage(Message("a-$now-$turnId", conversationId, "alexa", replyText, now))
 
         val audio = speak(turnId, replyText)
         return TurnResult(turnId, replyText, audio, interrupted = !turns.isCurrent(turnId))

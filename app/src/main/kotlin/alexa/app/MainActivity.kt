@@ -1,19 +1,29 @@
 package alexa.app
 
 import alexa.chat.ChatPipeline
-import alexa.memory.InMemoryMemoryStore
 import alexa.model.BudgetGuard
 import alexa.model.Location
 import alexa.model.ModelRouter
 import alexa.model.ModelSettings
 import alexa.model.RuleModel
+import alexa.packs.ContentStore
+import alexa.packs.Verdict
+import alexa.model.Integrity
+import alexa.permissions.AuditLog
+import alexa.permissions.Capability
+import alexa.permissions.PermissionGate
+import alexa.permissions.SessionManager
+import alexa.permissions.Settings as PermissionSettings
 import alexa.soul.SoulState
 import alexa.voice.AudioChunk
 import alexa.voice.SpeechSynthesizer
 import alexa.voice.TurnManager
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import android.view.ViewGroup
@@ -22,20 +32,34 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
+import java.io.File
 import java.util.Locale
 
 /**
- * Prvi ekran: chat s glasom. Tekst ide kroz ChatPipeline iz core modula,
- * odgovor se čita naglas Android TTS-om, a glas se prepoznaje Android
- * prepoznavanjem govora (push-to-talk).
- *
- * Odgovori su pravila iz stanja duše (RuleModel). Pravi jezički model dolazi u fazi 7.
+ * Glavni ekran: chat tekstom i glasom, postavke dozvola i uvoz paketa.
+ * Sesija prati pravila iz core-a: chat je aktivan dok je ekran otvoren,
+ * a tajmer tišine i 1 h bez obraćanja se provjeravaju periodično.
  */
 class MainActivity : Activity() {
     private lateinit var log: TextView
     private lateinit var input: EditText
-    private var tts: TextToSpeech? = null
+    private lateinit var store: SqliteMemoryStore
     private lateinit var chat: ChatPipeline
+    private lateinit var sessions: SessionManager
+    private lateinit var permissionSettings: PermissionSettings
+    private lateinit var appSettings: AppSettings
+    private lateinit var content: ContentStore
+    private lateinit var packFiles: PackStorage
+    private var tts: TextToSpeech? = null
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val ticker = object : Runnable {
+        override fun run() {
+            sessions.tick(System.currentTimeMillis())
+            handler.postDelayed(this, TICK_MS)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,18 +73,65 @@ class MainActivity : Activity() {
             }
         }
 
+        store = SqliteMemoryStore(this)
+        appSettings = AppSettings(this)
+        permissionSettings = appSettings.load()
+        sessions = SessionManager(PermissionGate(permissionSettings, AuditLog()))
+
+        content = ContentStore()
+        packFiles = PackStorage(File(filesDir, "packs"))
+        packFiles.loadAll().forEach { content.importZip(it) }
+
         val soul = SoulState()
         val router = ModelRouter(
             listOf(RuleModel(soul)),
             ModelSettings(Location.LOCAL, Location.LOCAL),
             BudgetGuard(1000),
         )
-        chat = ChatPipeline("glavni", soul, InMemoryMemoryStore(), router, TtsSynth(), TurnManager())
+        chat = ChatPipeline(CONVERSATION, soul, store, router, TtsSynth(), TurnManager())
 
+        buildUi()
+        store.messages(CONVERSATION).takeLast(HISTORY_SHOWN).forEach { m ->
+            appendLine((if (m.role == "user") "ti: " else "alexa: ") + m.text)
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        sessions.openChat(System.currentTimeMillis())
+        handler.post(ticker)
+    }
+
+    override fun onStop() {
+        handler.removeCallbacks(ticker)
+        sessions.closeChat(System.currentTimeMillis())
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        tts?.shutdown()
+        super.onDestroy()
+    }
+
+    private fun buildUi() {
         log = TextView(this).apply { textSize = 16f }
         val scroll = ScrollView(this).apply {
             addView(log)
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+        }
+
+        val settingsButton = Button(this).apply {
+            text = "Dozvole"
+            setOnClickListener { showPermissions() }
+        }
+        val packsButton = Button(this).apply {
+            text = "Uvezi paket"
+            setOnClickListener { pickPack() }
+        }
+        val topRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(settingsButton)
+            addView(packsButton)
         }
 
         input = EditText(this).apply {
@@ -79,7 +150,7 @@ class MainActivity : Activity() {
             text = "Govori"
             setOnClickListener { listen() }
         }
-        val row = LinearLayout(this).apply {
+        val inputRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             addView(input)
             addView(sendButton)
@@ -89,21 +160,19 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
+            addView(topRow)
             addView(scroll)
-            addView(row)
+            addView(inputRow)
         }
         setContentView(root)
     }
 
-    override fun onDestroy() {
-        tts?.shutdown()
-        super.onDestroy()
-    }
-
     private fun sendText(text: String) {
         if (text.isBlank()) return
+        val now = System.currentTimeMillis()
+        sessions.contact(now)
         tts?.stop() // novi turn poništava stari govor
-        val result = chat.handle(text, System.currentTimeMillis())
+        val result = chat.handle(text, now)
         appendLine("ti: $text")
         appendLine("alexa: ${result.replyText}")
     }
@@ -115,17 +184,74 @@ class MainActivity : Activity() {
         startActivityForResult(intent, REQUEST_SPEECH)
     }
 
+    /** Dozvole u postavkama: važe za sesiju, a prekidači se pamte. */
+    private fun showPermissions() {
+        val caps = Capability.entries.toTypedArray()
+        val checked = BooleanArray(caps.size) { permissionSettings.isOn(caps[it]) }
+        AlertDialog.Builder(this)
+            .setTitle("Dozvole (važe u sesiji)")
+            .setMultiChoiceItems(caps.map { it.name }.toTypedArray(), checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton("Sačuvaj") { _, _ ->
+                caps.forEachIndexed { i, capability ->
+                    permissionSettings.set(capability, checked[i])
+                    appSettings.save(capability, checked[i])
+                }
+                toast("Dozvole sačuvane")
+            }
+            .setNegativeButton("Odustani", null)
+            .show()
+    }
+
+    private fun pickPack() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+        startActivityForResult(intent, REQUEST_PACK)
+    }
+
+    private fun importPack(uri: android.net.Uri) {
+        val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        if (bytes == null) {
+            toast("Paket se ne može otvoriti")
+            return
+        }
+        val verdict = content.importZip(bytes)
+        val message = when (verdict) {
+            is Verdict.Accepted -> {
+                packFiles.save(Integrity.sha256Hex(bytes) + ".zip", bytes)
+                "Paket uvezen: ${verdict.manifest.name}"
+            }
+            is Verdict.Preserved -> {
+                packFiles.save(Integrity.sha256Hex(bytes) + ".zip", bytes)
+                "Nepoznat tip, sačuvan kao neaktivan: ${verdict.manifest.name}"
+            }
+            is Verdict.Rejected -> "Odbijeno: ${verdict.reason}"
+        }
+        appendLine("sistem: $message")
+        toast(message)
+    }
+
     @Deprecated("Koristi se za jednostavnost; prelazak na Activity Result API ide uz UI fazu.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_SPEECH && resultCode == RESULT_OK) {
-            val heard = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-            if (heard != null) sendText(heard)
+        if (resultCode != RESULT_OK) return
+        when (requestCode) {
+            REQUEST_SPEECH -> {
+                val heard = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+                if (heard != null) sendText(heard)
+            }
+            REQUEST_PACK -> data?.data?.let { importPack(it) }
         }
     }
 
     private fun appendLine(line: String) {
         log.append(line + "\n\n")
+    }
+
+    private fun toast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
     /** Izgovara rečenicu odmah na Android TTS-u. Audio se ne vraća kao bajtovi. */
@@ -137,6 +263,10 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        private const val CONVERSATION = "glavni"
+        private const val HISTORY_SHOWN = 30
+        private const val TICK_MS = 30_000L
         private const val REQUEST_SPEECH = 1
+        private const val REQUEST_PACK = 2
     }
 }
