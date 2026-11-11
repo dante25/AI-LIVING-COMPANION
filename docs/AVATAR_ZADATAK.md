@@ -88,6 +88,20 @@ Spremiti u `docs/avatar/model/`. Aplikacija će iz njih uzimati `android/app/src
 - **Kosa straga:** pojednostaviti uvijene pramenove u ploče sa alpha teksturom da ne izgleda kao crvi i da lakše radi na telefonu.
 - **Imena kostiju:** standardna humanoidna (Hips, Spine, Head, LeftHand...), da animacije iz biblioteke rade bez prepravki.
 
+
+### Idle modovi (šta radi kad je niko ne zove)
+
+Biraju se iz stanja duše (dosada, energija) i vremena bez obraćanja:
+
+- **Dosadno joj je:** sjedi **na podu** i **crta prstom po podu** (poza sitting-on-floor + petlja "crtanje prstom").
+  Referentna slika dolazi od vlasnika projekta; do tada vrijedi opis.
+- Spava ili zijeva kad je energija niska.
+- Gleda okolo, ljulja se, igra se kosom (kratke petlje u mirovanju).
+- Kad je pozovu po imenu: ustane i zaleti se prema ekranu (naslanja se, vidi referencu).
+
+Potrebni klipovi za ovo: sjedenje na pod (prijelaz iz stajanja), petlja crtanja prstom, ustajanje s poda. Ako ih nema
+u biblioteci animacija (Meshy/Tripo), animiraju se u Blenderu na rigu.
+
 ## Ulaz
 
 - Ako postoji 3D model (generisani kandidat): u Blenderu ga renderuj u **odvojene slojeve** (vidi Slojevi).

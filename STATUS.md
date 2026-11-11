@@ -38,6 +38,8 @@ Preuzimanje modela ne zavisi od dozvola. Ekstenzije se dodaju i preko MCP server
 - **Pokreti iz duše:** izraz lica i držanje dolaze iz stanja duše; usta prate zvuk Alexinog glasa (PCM iz TTS-a); treptanje, disanje, praćenje.
 - **"Alexa, miči se" (miči guzicu, makni se, smetaš mi):** lik se premješta na drugo mjesto na ekranu koje ne zaklanja tastaturu ni polje za unos. Prepoznavanje naredbe i biranje mjesta su gotovi u `core/soul` (`AvatarPlacement.kt`, testirano). Prikaz lika i prepoznavanje tastature u drugim aplikacijama (servis pristupačnosti) dolaze s avatarom.
 - Slične naredbe: idi lijevo/desno/gore/dolje, vrati se.
+- **Prirodan pokret:** nikad ne klizi. Ustane ako sjedi, okrene se, hoda brzinom klipa, okrene se na cilju, pa sjedne ili se nasloni (`AvatarMotion.kt`, testirano).
+- **Idle mod "dosadno":** sjedi na podu i crta prstom po podu (zahtjev vlasnika; slika referenca dolazi). Detalji u `docs/AVATAR_ZADATAK.md`.
 
 ## Nije urađeno (po redu)
 
