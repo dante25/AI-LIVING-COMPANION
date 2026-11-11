@@ -26,7 +26,7 @@ class ModelsActivity : Activity() {
         setContentView(R.layout.activity_list)
         title = getString(R.string.models_title)
 
-        storage = ModelStorage(File(filesDir, "models"))
+        storage = ModelStorage(ModelDownloads.modelsDir(this))
 
         findViewById<Button>(R.id.action_button).apply {
             text = getString(R.string.models_download)

@@ -37,6 +37,15 @@
         <activity
             android:name="alexa.app.CatalogActivity"
             android:label="@string/catalog_title" />
+
+        <!-- Prima javu da je preuzimanje modela završeno. -->
+        <receiver
+            android:name="alexa.app.DownloadReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
