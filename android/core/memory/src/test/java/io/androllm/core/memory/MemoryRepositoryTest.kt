@@ -24,6 +24,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -32,6 +33,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -239,6 +241,158 @@ class MemoryRepositoryTest {
         assertEquals(0, count)
         coVerify(exactly = 0) { memoryDao.getMemoryIdsWithoutEmbeddings() }
     }
+
+    // ── Review workflow ──────────────────────────────────────────────────────
+
+    @Test
+    fun `extracted memories are inserted as SUGGESTED`() = runTest {
+        coEvery { settingsStore.current() } returns MemorySettings(enabled = true, extractionEnabled = true)
+        coEvery { intelligence.extract(any(), any()) } returns Result.Success(
+            listOf(ExtractedMemory("User codes in Kotlin", io.androllm.core.memory.MemoryCategory.SKILLS, 2))
+        )
+        coEvery { projectDao.getByName(any()) } returns null
+        coEvery { tagDao.getByName(any()) } returns null
+        val saved = slot<MemoryEntity>()
+        coEvery { memoryDao.upsert(capture(saved)) } returns Unit
+
+        repo().processExchange(
+            MemoryExchange("c1", "I code in Kotlin", "Great!", emptyList(), 1, sourceMessageId = "msg-7")
+        )
+
+        assertEquals("SUGGESTED", saved.captured.status)
+        assertEquals("msg-7", saved.captured.sourceMessageId)
+    }
+
+    @Test
+    fun `manually saved memories are inserted as CONFIRMED`() = runTest {
+        coEvery { settingsStore.current() } returns MemorySettings(enabled = true)
+        coEvery { projectDao.getByName(any()) } returns null
+        coEvery { tagDao.getByName(any()) } returns null
+        val saved = slot<MemoryEntity>()
+        coEvery { memoryDao.upsert(capture(saved)) } returns Unit
+
+        repo().saveMemory(io.androllm.core.memory.MemoryCategory.PREFERENCES, "User prefers dark mode")
+
+        assertEquals("CONFIRMED", saved.captured.status)
+    }
+
+    @Test
+    fun `suggestion never overwrites a confirmed memory`() = runTest {
+        coEvery { settingsStore.current() } returns MemorySettings(enabled = true, extractionEnabled = true)
+        coEvery { intelligence.extract(any(), any()) } returns Result.Success(
+            listOf(ExtractedMemory("User prefers dark mode", io.androllm.core.memory.MemoryCategory.PREFERENCES, 3))
+        )
+        val existing = MemoryEntity("m1", "PREFERENCES", "User prefers dark mode", createdAt = 0L, updatedAt = 0L)
+        coEvery { memoryDao.getFilteredIds(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns listOf("m1")
+        coEvery { memoryDao.getByIds(any()) } returns listOf(existing)
+        coEvery { memoryDao.getById("m1") } returns existing
+
+        val summary = repo().processExchange(
+            MemoryExchange("c1", "I prefer dark mode", "ok", emptyList(), 2)
+        ).getOrNull()
+
+        assertEquals(0, summary!!.updated)
+        assertEquals(0, summary.inserted)
+        coVerify(exactly = 0) { memoryDao.update(any()) }
+        coVerify(exactly = 0) { memoryDao.upsert(any()) }
+    }
+
+    @Test
+    fun `confirmMemory sets status CONFIRMED`() = runTest {
+        val entity = MemoryEntity("m1", "CUSTOM", "User likes tea", createdAt = 0L, updatedAt = 0L, status = "SUGGESTED")
+        coEvery { memoryDao.getById("m1") } returns entity
+
+        val result = repo().confirmMemory("m1")
+
+        assertTrue(result.isSuccess())
+        coVerify(exactly = 1) { memoryDao.updateStatus("m1", "CONFIRMED", any()) }
+    }
+
+    @Test
+    fun `rejectMemory deletes a suggestion but refuses a confirmed memory`() = runTest {
+        coEvery { memoryDao.getById("s1") } returns
+            MemoryEntity("s1", "CUSTOM", "User likes tea", createdAt = 0L, updatedAt = 0L, status = "SUGGESTED")
+        coEvery { memoryDao.getById("c1") } returns
+            MemoryEntity("c1", "CUSTOM", "User likes coffee", createdAt = 0L, updatedAt = 0L, status = "CONFIRMED")
+
+        assertTrue(repo().rejectMemory("s1").isSuccess())
+        coVerify(exactly = 1) { memoryDao.deleteById("s1") }
+
+        assertFalse(repo().rejectMemory("c1").isSuccess())
+        coVerify(exactly = 0) { memoryDao.deleteById("c1") }
+    }
+
+    @Test
+    fun `correctMemory marks old CORRECTED and creates new CONFIRMED superseding it`() = runTest {
+        coEvery { settingsStore.current() } returns MemorySettings(enabled = true)
+        val old = MemoryEntity("old", "IDENTITY", "User name is Alice", createdAt = 0L, updatedAt = 0L, isPinned = true)
+        coEvery { memoryDao.getById("old") } returns old
+        coEvery { tagDao.getTagNamesForMemory("old") } returns emptyList()
+        val created = slot<MemoryEntity>()
+        val updatedOld = slot<MemoryEntity>()
+        coEvery { memoryDao.upsert(capture(created)) } returns Unit
+        coEvery { memoryDao.update(capture(updatedOld)) } returns Unit
+
+        val result = repo().correctMemory("old", "  User name is Bob ")
+
+        assertTrue(result.isSuccess())
+        assertEquals("CONFIRMED", created.captured.status)
+        assertEquals("old", created.captured.supersedesId)
+        assertEquals("User name is Bob", created.captured.content)
+        assertEquals("IDENTITY", created.captured.category)
+        assertEquals(result.getOrNull()?.memoryId, created.captured.id)
+        assertEquals("CORRECTED", updatedOld.captured.status)
+        assertEquals("old", updatedOld.captured.id)
+        assertFalse(updatedOld.captured.isPinned)
+        coVerify(exactly = 1) { embeddingDao.deleteByMemoryId("old") }
+    }
+
+    @Test
+    fun `correctMemory rejects blank content and unknown or already corrected memories`() = runTest {
+        coEvery { settingsStore.current() } returns MemorySettings(enabled = true)
+        coEvery { memoryDao.getById("m1") } returns
+            MemoryEntity("m1", "CUSTOM", "x", createdAt = 0L, updatedAt = 0L)
+        coEvery { memoryDao.getById("done") } returns
+            MemoryEntity("done", "CUSTOM", "x", createdAt = 0L, updatedAt = 0L, status = "CORRECTED")
+        coEvery { memoryDao.getById("missing") } returns null
+
+        assertFalse(repo().correctMemory("m1", "   ").isSuccess())
+        assertFalse(repo().correctMemory("done", "new text").isSuccess())
+        assertFalse(repo().correctMemory("missing", "new text").isSuccess())
+        coVerify(exactly = 0) { memoryDao.upsert(any()) }
+    }
+
+    @Test
+    fun `updateContent edits text in place and keeps status`() = runTest {
+        coEvery { settingsStore.current() } returns MemorySettings(enabled = true)
+        coEvery { memoryDao.getById("m1") } returns
+            MemoryEntity("m1", "CUSTOM", "User likes tea", createdAt = 0L, updatedAt = 0L, status = "SUGGESTED")
+        val updated = slot<MemoryEntity>()
+        coEvery { memoryDao.update(capture(updated)) } returns Unit
+
+        val result = repo().updateContent("m1", "User likes green tea")
+
+        assertTrue(result.isSuccess())
+        assertEquals("User likes green tea", updated.captured.content)
+        assertEquals("SUGGESTED", updated.captured.status)
+    }
+
+    @Test
+    fun `retrieve excludes suggested and corrected memories from candidates`() = runTest {
+        coEvery { settingsStore.current() } returns MemorySettings(enabled = true)
+        coEvery { memoryDao.getFilteredIds(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
+            listOf("ok", "sug", "old")
+        coEvery { memoryDao.getIdsWithStatus("SUGGESTED") } returns listOf("sug")
+        coEvery { memoryDao.getIdsWithStatus("CORRECTED") } returns listOf("old")
+        coEvery { memoryDao.searchContentIds(any()) } returns emptyList()
+        coEvery { memoryDao.searchTagIds(any()) } returns emptyList()
+        coEvery { memoryDao.getByIds(any()) } returns listOf(
+            MemoryEntity("ok", "CUSTOM", "Confirmed note", createdAt = 1L, updatedAt = 1L)
+        )
+
+        val results = repo().retrieve("note").getOrNull().orEmpty()
+
+        assertEquals(listOf("ok"), results.map { it.memory.id })
+        coVerify { memoryDao.getByIds(listOf("ok")) }
+    }
 }
-
-

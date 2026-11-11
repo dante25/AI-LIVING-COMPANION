@@ -2,10 +2,16 @@ package io.androllm.core.tools.executor
 
 import io.androllm.core.tools.api.ToolCall
 import io.androllm.core.tools.api.ToolResult
+import io.androllm.core.tools.audit.AuditDecision
+import io.androllm.core.tools.audit.AuditEntry
+import io.androllm.core.tools.audit.AuditLog
 import io.androllm.core.tools.clarification.ClarificationEngine
 import io.androllm.core.tools.confirmation.ToolConfirmationManager
 import io.androllm.core.tools.confirmation.buildConfirmation
 import io.androllm.core.tools.monitoring.ToolHealthMonitor
+import io.androllm.core.tools.policy.PermissionPolicyEvaluator
+import io.androllm.core.tools.policy.PolicyVerdict
+import io.androllm.core.tools.policy.ToolSessionState
 import io.androllm.core.tools.registry.ToolRegistry
 import io.androllm.core.tools.settings.AutomationSettingsStore
 import io.androllm.core.tools.trace.ToolExecutionTraceStore
@@ -26,10 +32,13 @@ import timber.log.Timber
  *
  * 1. **Permission gate** — the master switch and the per-tool toggles from
  *    Settings → Automation; a blocked tool returns a [ToolResult.Failure].
- * 2. **Confirmation gate** — tools marked high-risk (or everything when the
+ * 2. **Policy gate** — per-permission policy (off / ask every time / ask once
+ *    per session); every decision is written to the persistent [AuditLog].
+ *    Model downloads are not tools and never pass through here.
+ * 3. **Confirmation gate** — tools marked high-risk (or everything when the
  *    user picked "Always") go through [ToolConfirmationManager] first; a
  *    denial becomes a [ToolResult.Failure] that the LLM can explain.
- * 3. **Timeout** — runaway plugin tools are cut off instead of hanging a turn.
+ * 4. **Timeout** — runaway plugin tools are cut off instead of hanging a turn.
  *
  * The executor is deliberately the ONLY place that runs tool code: plugins can
  * never bypass the gates by calling [io.androllm.core.tools.api.Tool.execute]
@@ -41,6 +50,8 @@ class ToolExecutor @Inject constructor(
     private val settingsStore: AutomationSettingsStore,
     private val confirmationManager: ToolConfirmationManager,
     private val traceStore: ToolExecutionTraceStore,
+    private val sessionState: ToolSessionState,
+    private val auditLog: AuditLog,
     private val validator: ToolCallValidator = ToolCallValidator(registry),
     private val logger: ToolExecutionLogger = ToolExecutionLogger(),
     private val healthMonitor: ToolHealthMonitor = ToolHealthMonitor(),
@@ -162,19 +173,57 @@ class ToolExecutor @Inject constructor(
             )
         }
 
-        // ── Confirmation gate (Permission Manager) ──────────────────────────
-        // Sensitive tools require confirmation: SMS, Phone Calls, Payments, Email, Calendar Changes, Deleting Files, System Changes, External API with side effects.
-        // Everything else executes automatically (spec.requiresConfirmation).
-        if (settings.shouldConfirm(spec.requiresConfirmation)) {
+        // ── Policy + confirmation gate ───────────────────────────────────────
+        // One card covers both: the permission policy (ask every time / once per
+        // session) and the high-risk confirmation (SMS, calls, e-mail, deletes —
+        // spec.requiresConfirmation + ConfirmationMode). A session grant NEVER
+        // skips a high-risk confirmation.
+        sessionState.touch()
+        val sessionId = sessionState.sessionId()
+        suspend fun audit(decision: AuditDecision, detail: String = "") {
+            runCatching {
+                auditLog.record(
+                    AuditEntry(
+                        timestamp = System.currentTimeMillis(),
+                        tool = spec.name,
+                        permission = spec.permission?.name,
+                        decision = decision,
+                        sessionId = sessionId,
+                        detail = detail
+                    )
+                )
+            }
+        }
+
+        val verdict = PermissionPolicyEvaluator.evaluate(spec.permission, settings.permissionPolicies, sessionState)
+        if (verdict is PolicyVerdict.Blocked) {
+            Timber.i("ToolExecutor: '${spec.name}' blocked by policy for ${verdict.permission}")
+            audit(AuditDecision.DENIED, "policy off: ${verdict.permission.name}")
+            return finish(
+                ToolResult.Failure(
+                    "The '${spec.name}' tool is turned off for ${verdict.permission.displayName} in Settings → Automation.",
+                    retryable = false
+                ),
+                error = "blocked by policy"
+            )
+        }
+
+        val policyAsks = verdict is PolicyVerdict.Ask
+        if (policyAsks || settings.shouldConfirm(spec.requiresConfirmation)) {
             val approved = confirmationManager.awaitDecision(buildConfirmation(call, spec))
             if (!approved) {
                 Timber.i("ToolExecutor: '${spec.name}' declined by user")
                 healthMonitor.recordFailure(spec.name, 0L, "user declined", isTimeout = false)
+                audit(AuditDecision.DENIED, "declined by user")
                 return finish(
                     ToolResult.Failure("The user declined the action.", retryable = false),
                     error = "declined by user"
                 )
             }
+            if (verdict is PolicyVerdict.Ask) verdict.sessionGrantable.forEach { sessionState.grant(it) }
+            audit(AuditDecision.CONFIRMED)
+        } else {
+            audit(AuditDecision.ALLOWED)
         }
 
         // ── Execute with timeout — sandboxed (one failed tool never crashes the agent) ───

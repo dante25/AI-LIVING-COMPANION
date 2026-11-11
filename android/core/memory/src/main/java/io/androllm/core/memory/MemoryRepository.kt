@@ -505,7 +505,7 @@ class MemoryRepository @Inject constructor(
             var skipped = 0
             val writtenIds = mutableListOf<String>()
             for (item in items) {
-                val r = writeMemory(item, exchange, settings)
+                val r = writeMemory(item, exchange, settings, status = MemoryStatus.SUGGESTED)
                 when (r.action) {
                     MemoryWriteAction.INSERTED -> { inserted++; writtenIds += r.memoryId }
                     MemoryWriteAction.UPDATED -> updated++
@@ -605,6 +605,142 @@ class MemoryRepository @Inject constructor(
         memoryDao.updateImportance(id, importance.coerceIn(1, 5), System.currentTimeMillis())
     }
 
+    // ── Review workflow (suggestions, corrections) ──
+
+    /** User approved a suggestion: it becomes CONFIRMED and from now on may be injected into prompts. */
+    override suspend fun confirmMemory(id: String): Result<Unit> = io.androllm.core.common.runCatching {
+        writeMutex.withLock {
+            val entity = memoryDao.getById(id) ?: throw IllegalArgumentException("Memory not found: $id")
+            if (MemoryStatus.fromName(entity.status) == MemoryStatus.CORRECTED) {
+                throw IllegalStateException("A corrected memory cannot be confirmed: $id")
+            }
+            memoryDao.updateStatus(id, MemoryStatus.CONFIRMED.name, System.currentTimeMillis())
+            cacheMutex.withLock { retrievalCache.clear() }
+            logger.info("Confirmed memory $id")
+        }
+    }
+
+    /** User dismissed a suggestion: it is deleted (only SUGGESTED memories can be rejected). */
+    override suspend fun rejectMemory(id: String): Result<Unit> = io.androllm.core.common.runCatching {
+        val entity = memoryDao.getById(id) ?: throw IllegalArgumentException("Memory not found: $id")
+        if (MemoryStatus.fromName(entity.status) != MemoryStatus.SUGGESTED) {
+            throw IllegalStateException("Only a suggested memory can be rejected: $id")
+        }
+        deleteMemory(id).getOrThrow()
+    }
+
+    /**
+     * Explicit user correction: the old claim is marked CORRECTED (kept as history, never injected)
+     * and a new CONFIRMED memory with `supersedesId = oldId` replaces it. Tags, category, project,
+     * pin state and priority carry over to the replacement.
+     */
+    override suspend fun correctMemory(oldId: String, newContent: String): Result<MemoryWriteResult> =
+        io.androllm.core.common.runCatching {
+            val content = validateUserContent(newContent)
+            writeMutex.withLock {
+                val old = memoryDao.getById(oldId) ?: throw IllegalArgumentException("Memory not found: $oldId")
+                if (MemoryStatus.fromName(old.status) == MemoryStatus.CORRECTED) {
+                    throw IllegalStateException("Memory is already corrected: $oldId")
+                }
+                val now = System.currentTimeMillis()
+                val newId = UUID.randomUUID().toString()
+                val oldTags = try { tagDao.getTagNamesForMemory(oldId) } catch (_: Exception) { emptyList() }
+
+                memoryDao.upsert(
+                    old.copy(
+                        id = newId,
+                        content = content,
+                        summary = null,
+                        status = MemoryStatus.CONFIRMED.name,
+                        supersedesId = oldId,
+                        accessCount = 0,
+                        createdAt = now,
+                        updatedAt = now,
+                        lastAccessedAt = now,
+                        lastUsedAt = now
+                    )
+                )
+                val tagIds = resolveTagIds(oldTags)
+                if (tagIds.isNotEmpty()) {
+                    tagDao.insertCrossRefs(tagIds.map { MemoryTagCrossRef(newId, it) })
+                }
+                memoryDao.update(
+                    old.copy(
+                        status = MemoryStatus.CORRECTED.name,
+                        isPinned = false,
+                        updatedAt = now
+                    )
+                )
+                // The replaced claim must not be retrievable any more.
+                try { embeddingDao.deleteByMemoryId(oldId) } catch (_: Exception) {}
+                indexMutex.withLock { vectorIndex?.remove(oldId) }
+                reembedMemory(newId, content, now)
+                cacheMutex.withLock { retrievalCache.clear() }
+                logger.info("Corrected memory $oldId -> $newId")
+                MemoryWriteResult(newId, MemoryWriteAction.INSERTED)
+            }
+        }
+
+    /** Edits the text of a memory in place (typo fixes), keeping its status; re-embeds it. */
+    override suspend fun updateContent(id: String, newContent: String): Result<Unit> =
+        io.androllm.core.common.runCatching {
+            val content = validateUserContent(newContent)
+            writeMutex.withLock {
+                val entity = memoryDao.getById(id) ?: throw IllegalArgumentException("Memory not found: $id")
+                if (MemoryStatus.fromName(entity.status) == MemoryStatus.CORRECTED) {
+                    throw IllegalStateException("A corrected memory cannot be edited: $id")
+                }
+                val now = System.currentTimeMillis()
+                memoryDao.update(entity.copy(content = content, updatedAt = now))
+                reembedMemory(id, content, now)
+                cacheMutex.withLock { retrievalCache.clear() }
+                logger.info("Updated content of memory $id")
+            }
+        }
+
+    /** Trims/validates text typed by the user; throws [IllegalArgumentException] when it cannot be stored. */
+    private fun validateUserContent(raw: String): String {
+        val content = raw.trim().replace(WHITESPACE, " ")
+        if (content.isEmpty()) throw IllegalArgumentException("Memory content is empty")
+        if (content.length > MAX_MEMORY_LENGTH) throw IllegalArgumentException("Memory content is too long")
+        if (securityFilter.containsSecrets(content) || securityFilter.containsPromptInjection(content)) {
+            throw IllegalArgumentException("Memory content looks unsafe to store")
+        }
+        return content
+    }
+
+    /** Re-embeds one memory after its text changed (drops the stale vector when no embedder is available). */
+    private suspend fun reembedMemory(id: String, content: String, now: Long) {
+        try {
+            val settings = settingsStore.current()
+            val embedding = embedForWrite(content, settings)
+            if (embedding != null) {
+                embeddingDao.upsert(
+                    EmbeddingEntity(
+                        memoryId = id,
+                        vector = VectorMath.toBytes(embedding),
+                        dimension = embedding.size,
+                        modelPath = embeddingSourceLabel(settings),
+                        createdAt = now
+                    )
+                )
+                indexMutex.withLock {
+                    val idx = ensureVectorIndexLocked() ?: CosineVectorIndex(embedding.size).also { vectorIndex = it }
+                    if (idx.dimension != embedding.size) {
+                        vectorIndex = CosineVectorIndex(embedding.size)
+                    } else {
+                        idx.upsert(id, embedding)
+                    }
+                }
+            } else {
+                try { embeddingDao.deleteByMemoryId(id) } catch (_: Exception) {}
+                indexMutex.withLock { vectorIndex?.remove(id) }
+            }
+        } catch (e: Exception) {
+            logger.warn("Re-embed failed for $id: ${e.message}")
+        }
+    }
+
     /**
      * Wipes the entire memory store (database, index, logs) — transactional with rollback.
      */
@@ -660,7 +796,10 @@ class MemoryRepository @Inject constructor(
                     isPinned = m.isPinned,
                     isArchived = m.isArchived,
                     createdAt = m.createdAt,
-                    updatedAt = m.updatedAt
+                    updatedAt = m.updatedAt,
+                    status = m.status,
+                    supersedesId = m.supersedesId,
+                    sourceMessageId = m.sourceMessageId
                 )
             },
             relationships = relationships.map {
@@ -693,6 +832,31 @@ class MemoryRepository @Inject constructor(
             var skipped = 0
             for (item in dto.memories) {
                 val category = MemoryCategory.fromName(item.category)
+                val itemStatus = MemoryStatus.fromName(item.status)
+                if (itemStatus == MemoryStatus.CORRECTED) {
+                    // History row: restored as-is (original id keeps supersedes links valid), never deduped or embedded.
+                    if (memoryDao.getById(item.id) != null) {
+                        skipped++
+                    } else {
+                        memoryDao.upsert(
+                            MemoryEntity(
+                                id = item.id,
+                                category = category.name,
+                                content = item.content,
+                                importance = item.importance.coerceIn(1, 5),
+                                priority = item.importance.coerceIn(1, 5),
+                                createdAt = item.createdAt,
+                                updatedAt = item.updatedAt,
+                                isArchived = item.isArchived,
+                                status = MemoryStatus.CORRECTED.name,
+                                supersedesId = item.supersedesId,
+                                sourceMessageId = item.sourceMessageId
+                            )
+                        )
+                        inserted++
+                    }
+                    continue
+                }
                 val result = writeMemory(
                     ExtractedMemory(
                         content = item.content,
@@ -703,7 +867,8 @@ class MemoryRepository @Inject constructor(
                     ),
                     MemoryExchange("", "", "", emptyList(), 0),
                     settings,
-                    forceInsert = false
+                    forceInsert = false,
+                    status = itemStatus
                 )
                 when (result.action) {
                     MemoryWriteAction.INSERTED -> {
@@ -715,7 +880,10 @@ class MemoryRepository @Inject constructor(
                                     isPinned = item.isPinned,
                                     isArchived = item.isArchived,
                                     createdAt = item.createdAt,
-                                    updatedAt = item.updatedAt
+                                    updatedAt = item.updatedAt,
+                                    status = itemStatus.name,
+                                    supersedesId = item.supersedesId,
+                                    sourceMessageId = item.sourceMessageId
                                 )
                             )
                         }
@@ -851,7 +1019,17 @@ class MemoryRepository @Inject constructor(
 
     // ── Internals ──
 
+    /**
+     * Retrieval candidates: the filtered set minus everything that is not CONFIRMED
+     * (pending suggestions and corrected/superseded memories never reach the prompt).
+     */
     private suspend fun candidateIds(filters: MemorySearchFilters, now: Long = System.currentTimeMillis()): Set<String> {
+        val excluded = memoryDao.getIdsWithStatus(MemoryStatus.SUGGESTED.name).toSet() +
+            memoryDao.getIdsWithStatus(MemoryStatus.CORRECTED.name)
+        return rawCandidateIds(filters, now) - excluded
+    }
+
+    private suspend fun rawCandidateIds(filters: MemorySearchFilters, now: Long): Set<String> {
         val minImportance = maxOf(filters.minImportance, filters.minPriority)
         val typeName = filters.type?.name
         if (filters.tags.isEmpty()) {
@@ -981,7 +1159,8 @@ class MemoryRepository @Inject constructor(
         item: ExtractedMemory,
         exchange: MemoryExchange,
         settings: MemorySettings,
-        forceInsert: Boolean = false
+        forceInsert: Boolean = false,
+        status: MemoryStatus = MemoryStatus.CONFIRMED
     ): MemoryWriteResult = writeMutex.withLock {
         val now = System.currentTimeMillis()
         var content = item.content.trim().replace(WHITESPACE, " ")
@@ -1054,9 +1233,13 @@ class MemoryRepository @Inject constructor(
         if (embedding != null) {
             val index = ensureVectorIndex()
             if (index != null && index.size > 0) {
-                val sameCategory = memoryDao.getFilteredIds(effectiveCategory.name, null, false, true, 0, null)
+                val sameCategory = nonCorrectedIdsFor(effectiveCategory.name)
                 val best = index.search(embedding, 1, sameCategory).firstOrNull()
                 if (best != null) {
+                    if (suggestionBlockedBy(status, best.id)) {
+                        logger.debug("Suggestion skipped: matches user-reviewed memory ${best.id}")
+                        return@withLock MemoryWriteResult(best.id, MemoryWriteAction.SKIPPED, best.score)
+                    }
                     when {
                         best.score >= settings.similarityThreshold -> {
                             // Resolve conflicting memories before updating: timestamps, confidence, evidence
@@ -1068,11 +1251,11 @@ class MemoryRepository @Inject constructor(
                                     return@withLock MemoryWriteResult(existingForConflict.id, MemoryWriteAction.SKIPPED)
                                 }
                             }
-                            return@withLock updateExisting(best.id, item.copy(content = content, category = effectiveCategory, importance = priority), projectId, now, best.score, type, chatId, priority, expiryAt)
+                            return@withLock updateExisting(best.id, item.copy(content = content, category = effectiveCategory, importance = priority), projectId, now, best.score, type, chatId, priority, expiryAt, incomingStatus = status)
                         }
                         best.score >= settings.similarityThreshold - 0.08f -> {
                             logger.debug("Merging similar memory (score ${"%.3f".format(best.score)}): '${content.take(40)}'")
-                            return@withLock updateExisting(best.id, item.copy(content = content, category = effectiveCategory, importance = priority), projectId, now, best.score, type, chatId, priority, expiryAt, mergeContent = true)
+                            return@withLock updateExisting(best.id, item.copy(content = content, category = effectiveCategory, importance = priority), projectId, now, best.score, type, chatId, priority, expiryAt, mergeContent = true, incomingStatus = status)
                         }
                     }
                 }
@@ -1082,6 +1265,10 @@ class MemoryRepository @Inject constructor(
         // 2) Normalized exact-content dedupe (no embedding available) — deterministic via hardeningHelper
         if (!forceInsert) {
             val existing = findExactDuplicate(content, effectiveCategory)
+            if (existing != null && suggestionBlockedBy(status, existing.id)) {
+                logger.debug("Suggestion skipped: matches user-reviewed memory ${existing.id}")
+                return@withLock MemoryWriteResult(existing.id, MemoryWriteAction.SKIPPED)
+            }
             if (existing != null) {
                 // Intelligent update when new information supersedes older: use conflict resolver
                 val existingDomain = try { existing.toDomain(tagDao.getTagNamesForMemory(existing.id)) } catch (_: Exception) { null }
@@ -1092,7 +1279,7 @@ class MemoryRepository @Inject constructor(
                         return@withLock MemoryWriteResult(existingDomain.id, MemoryWriteAction.SKIPPED)
                     }
                 }
-                return@withLock updateExisting(existing.id, item.copy(content = content, category = effectiveCategory, importance = priority), projectId, now, null, type, chatId, priority, expiryAt)
+                return@withLock updateExisting(existing.id, item.copy(content = content, category = effectiveCategory, importance = priority), projectId, now, null, type, chatId, priority, expiryAt, incomingStatus = status)
             }
         }
 
@@ -1116,7 +1303,9 @@ class MemoryRepository @Inject constructor(
                     updatedAt = now,
                     lastAccessedAt = now,
                     lastUsedAt = now,
-                    expiryAt = expiryAt
+                    expiryAt = expiryAt,
+                    status = status.name,
+                    sourceMessageId = exchange.sourceMessageId
                 )
             )
             if (tagIds.isNotEmpty()) {
@@ -1165,7 +1354,8 @@ class MemoryRepository @Inject constructor(
         chatId: String? = null,
         priority: Int? = null,
         expiryAt: Long? = null,
-        mergeContent: Boolean = false
+        mergeContent: Boolean = false,
+        incomingStatus: MemoryStatus = MemoryStatus.CONFIRMED
     ): MemoryWriteResult {
         val existing = try { memoryDao.getById(id) } catch (e: Exception) {
             logger.warn("updateExisting: getById failed for $id: ${e.message}")
@@ -1212,7 +1402,11 @@ class MemoryRepository @Inject constructor(
                     chatId = newChatId,
                     sourceConversationId = newChatId ?: existing.sourceConversationId,
                     type = newType,
-                    expiryAt = newExpiry
+                    expiryAt = newExpiry,
+                    // A user-entered (CONFIRMED) write promotes a pending suggestion; nothing else changes status.
+                    status = if (incomingStatus == MemoryStatus.CONFIRMED &&
+                        MemoryStatus.fromName(existing.status) == MemoryStatus.SUGGESTED
+                    ) MemoryStatus.CONFIRMED.name else existing.status
                 )
             )
             // Merge tags: drop old crossrefs, insert merged set.
@@ -1268,9 +1462,25 @@ class MemoryRepository @Inject constructor(
         }
     }
 
+    /** Ids in a category for dedupe purposes: everything except memories already replaced by a correction. */
+    private suspend fun nonCorrectedIdsFor(categoryName: String): List<String> {
+        val corrected = memoryDao.getIdsWithStatus(MemoryStatus.CORRECTED.name).toSet()
+        return memoryDao.getFilteredIds(categoryName, null, false, true, 0, null).filterNot { it in corrected }
+    }
+
+    /**
+     * An automatic suggestion must never overwrite or merge into a memory the user already reviewed
+     * (CONFIRMED). Only another pending suggestion may be updated by a suggestion.
+     */
+    private suspend fun suggestionBlockedBy(incoming: MemoryStatus, existingId: String): Boolean {
+        if (incoming != MemoryStatus.SUGGESTED) return false
+        val existing = try { memoryDao.getById(existingId) } catch (_: Exception) { null } ?: return false
+        return MemoryStatus.fromName(existing.status) != MemoryStatus.SUGGESTED
+    }
+
     private suspend fun findExactDuplicate(content: String, category: MemoryCategory): MemoryEntity? {
         val norm = normalizeForCompare(content)
-        val ids = memoryDao.getFilteredIds(category.name, null, false, true, 0, null)
+        val ids = nonCorrectedIdsFor(category.name)
         val entities = memoryDao.getByIds(ids)
         // Exact match first
         entities.firstOrNull { normalizeForCompare(it.content) == norm }?.let { return it }
@@ -1375,7 +1585,7 @@ class MemoryRepository @Inject constructor(
     }
 
     companion object {
-        private const val EXPORT_VERSION = 1
+        private const val EXPORT_VERSION = 2
         private const val MAX_MEMORY_LENGTH = 800
         private const val HYBRID_KEYWORD_BOOST = 0.06f
         /** Rescue floor: best semantic hits below the strict threshold but above this are kept. */
@@ -1405,7 +1615,11 @@ internal data class MemoryExportItem(
     val isPinned: Boolean = false,
     val isArchived: Boolean = false,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    // Added in export version 2; optional so version-1 files still import (as CONFIRMED).
+    val status: String = "CONFIRMED",
+    val supersedesId: String? = null,
+    val sourceMessageId: String? = null
 )
 
 @Serializable
@@ -1437,7 +1651,10 @@ internal fun MemoryEntity.toDomain(tags: List<String>): Memory = Memory(
     summary = summary,
     priority = if (priority == 1 && importance != 1) importance else priority,
     lastUsedAt = lastUsedAt,
-    expiryAt = expiryAt
+    expiryAt = expiryAt,
+    status = MemoryStatus.fromName(status),
+    supersedesId = supersedesId,
+    sourceMessageId = sourceMessageId
 )
 
 internal fun SummaryEntity.toDomain(): MemorySummary = MemorySummary(

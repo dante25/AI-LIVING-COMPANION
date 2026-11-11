@@ -1,6 +1,7 @@
 package io.androllm.core.memory.context
 
 import io.androllm.core.memory.MemoryCategory
+import io.androllm.core.memory.MemoryStatus
 import io.androllm.core.memory.model.Memory
 import io.androllm.core.memory.model.MemorySearchResult
 import io.androllm.core.memory.model.MemorySummary
@@ -52,6 +53,28 @@ class ContextBuilderTest {
         val text = builder.buildSystemText(memories, emptyList(), maxMemories = 3, maxSummaries = 0)
         assertFalse(text.contains("M4"))
         assertTrue(text.contains("M1"))
+    }
+
+    @Test
+    fun `suggested and corrected memories never reach the prompt`() {
+        val confirmed = memory("User prefers Kotlin")
+        val suggested = memory("User likes cats").copy(id = "m2", status = MemoryStatus.SUGGESTED)
+        val corrected = memory("User lives in Mostar").copy(id = "m3", status = MemoryStatus.CORRECTED)
+        val text = builder.buildSystemText(
+            memories = listOf(confirmed, suggested, corrected).map { MemorySearchResult(it, 0.9f) },
+            summaries = emptyList(),
+            maxMemories = 5,
+            maxSummaries = 0
+        )
+        assertTrue(text.contains("User prefers Kotlin"))
+        assertFalse(text.contains("cats"))
+        assertFalse(text.contains("Mostar"))
+    }
+
+    @Test
+    fun `only unconfirmed memories yields empty text`() {
+        val suggested = memory("User likes cats").copy(status = MemoryStatus.SUGGESTED)
+        assertEquals("", builder.buildSystemText(listOf(MemorySearchResult(suggested, 0.9f)), emptyList(), 5, 0))
     }
 
     @Test

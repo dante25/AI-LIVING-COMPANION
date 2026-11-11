@@ -16,7 +16,20 @@ enum class MemoryCategory(val label: String) {
     DEVICES("Devices"),
     PINNED_FACTS("Pinned Facts"),
     DEVELOPER_NOTES("Developer Notes"),
-    CUSTOM("Custom");
+    CUSTOM("Custom"),
+
+    /** Relationship with the companion: jokes, nice moments. */
+    RELATIONSHIP_MOMENT("Relationship Moment"),
+
+    /** Relationship with the companion: arguments, conflicts. */
+    RELATIONSHIP_CONFLICT("Relationship Conflict"),
+
+    /** Relationship with the companion: what bothers her / what she dislikes. */
+    RELATIONSHIP_DISLIKE("Relationship Dislike");
+
+    /** True for the three relationship categories (shown separately in the UI). */
+    val isRelationship: Boolean
+        get() = this == RELATIONSHIP_MOMENT || this == RELATIONSHIP_CONFLICT || this == RELATIONSHIP_DISLIKE
 
     companion object {
         /**

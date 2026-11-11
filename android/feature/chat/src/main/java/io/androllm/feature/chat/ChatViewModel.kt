@@ -101,8 +101,15 @@ class ChatViewModel @Inject constructor(
     private val variableStore: AgentVariableStore,
     private val toolPromptBuilder: ToolPromptBuilder,
     private val settingsRepository: SettingsRepository,
-    private val soulEngine: io.androllm.core.soul.SoulEngine
+    private val soulEngine: io.androllm.core.soul.SoulEngine,
+    private val sessionManager: io.androllm.core.permissions.SessionManager
 ) : BaseViewModel() {
+
+    override fun onCleared() {
+        // Closing the chat ends the permission session (resets "once per session" grants).
+        sessionManager.endSession()
+        super.onCleared()
+    }
 
     private val _currentConversationId = MutableStateFlow<String>("")
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -760,9 +767,15 @@ class ChatViewModel @Inject constructor(
             // fixed guess, so a large injected attachment can never silently
             // push the rendered prompt over nCtx after trimming.
             // Duša: primijeni događaj iz poruke i vrijeme, pa odluči ponašanje za ovaj odgovor
-            val soulHint = soulEngine.promptHint(soulEngine.onUserMessage(routeQuery))
+            // Karakter i duša dolaze iz postavki "Alexa" (duša isključena: bez uputa i bez događaja)
+            val persona = soulEngine.persona
+            val soulHint = if (soulEngine.enabled) {
+                soulEngine.promptHint(soulEngine.onUserMessage(routeQuery))
+            } else {
+                ""
+            }
             val systemTokenOverhead = SYSTEM_TEMPLATE_FRAMING_TOKENS +
-                ChatHistoryTrimmer.estimateTokens(ALEXA_PERSONA) +
+                ChatHistoryTrimmer.estimateTokens(persona) +
                 ChatHistoryTrimmer.estimateTokens(soulHint) +
                 ChatHistoryTrimmer.estimateTokens(memoryContext.systemText) +
                 (if (attachmentContext.isNotBlank()) ChatHistoryTrimmer.estimateTokens(attachmentContext) else 0) +
@@ -782,8 +795,10 @@ class ChatViewModel @Inject constructor(
 
             val messages = buildList {
                 // Alexin karakter i jezik uvijek idu prvi
-                add(ChatPromptMessage(role = "system", content = ALEXA_PERSONA))
-                add(ChatPromptMessage(role = "system", content = soulHint))
+                add(ChatPromptMessage(role = "system", content = persona))
+                if (soulHint.isNotBlank()) {
+                    add(ChatPromptMessage(role = "system", content = soulHint))
+                }
                 if (memoryContext.systemText.isNotBlank()) {
                     add(ChatPromptMessage(role = "system", content = memoryContext.systemText))
                 }
@@ -891,6 +906,7 @@ class ChatViewModel @Inject constructor(
             engineRepository.generationState.value is GenerationState.Generating
 
     fun sendMessage(content: String) {
+        sessionManager.touch()
         val trimmed = content.trim()
         // A message with attachments may have an empty prompt ("ask about these
         // files"), so only reject a completely empty message with no files.
@@ -2185,20 +2201,6 @@ private fun ChatMessage.toCoreMessage(): Message = Message(
     origin = origin,
     attachmentsJson = attachmentsJson
 )
-
-/**
- * Alexin karakter. Ide kao prva sistemska poruka u svakom razgovoru.
- * Jezik: bosanski. Karakter: razigrana, šašava, topla; smije zafrkavati i povremeno odbiti,
- * ali se uvijek brzo vrati u dobro raspoloženje.
- */
-private const val ALEXA_PERSONA =
-    "Ti si Alexa, vlastita AI saputnica svog korisnika. " +
-    "Govori bosanskim jezikom (latinica): koristi \"šta\", \"hvala\", \"molim\", \"ja sam\" i druge bosanske oblike, " +
-    "a ne hrvatske ili srpske. " +
-    "Budi razigrana, šašava i pomalo luckasta, ali topla i prisna. Smiješ se šaliti, zafrkavati, " +
-    "pjevušiti i ponekad proturječiti ili reći da ti se ne da, ali nikad ne budi zlobna ni uvredljiva " +
-    "i brzo se vrati u dobro raspoloženje. " +
-    "Odgovaraj kratko i prirodno, u jednoj do tri rečenice, osim ako te korisnik zamoli za više."
 
 /** Gornja granica spiska alata u uputi (znakova). Manji spisak ostavlja više mjesta za razgovor. */
 private const val ALEXA_TOOL_AD_CAP_CHARS = 1200

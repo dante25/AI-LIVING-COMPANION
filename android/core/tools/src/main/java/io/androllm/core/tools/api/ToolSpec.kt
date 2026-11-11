@@ -43,7 +43,27 @@ enum class ToolPermission(val displayName: String, val description: String) {
     TRANSLATION("Translation", "Open Google Translate"),
     MEDIA("Media", "Open gallery and media apps"),
     DEVICE("Device Info", "Read device state and information"),
-    LOCATION("Location", "Read the device's current location")
+    LOCATION("Location", "Read the device's current location"),
+    /** Umbrella gate for every tool that talks to the network (see [alsoRequires]). */
+    INTERNET("Internet", "Tools that send requests over the internet"),
+    /** Umbrella gate for every tool that records from the microphone (see [alsoRequires]). */
+    MICROPHONE("Microphone", "Tools that record audio")
+}
+
+/**
+ * Umbrella permissions that must ALSO pass the policy check for a tool guarded
+ * by this permission. Example: the weather tool is gated by [ToolPermission.WEATHER]
+ * and additionally by [ToolPermission.INTERNET]. Model downloads are NOT tools
+ * and never go through this gate.
+ */
+fun ToolPermission.alsoRequires(): List<ToolPermission> = when (this) {
+    ToolPermission.WEATHER,
+    ToolPermission.SEARCH,
+    ToolPermission.GITHUB,
+    ToolPermission.MCP -> listOf(ToolPermission.INTERNET)
+    ToolPermission.VOICE_RECORDER -> listOf(ToolPermission.MICROPHONE)
+    ToolPermission.QR -> listOf(ToolPermission.CAMERA)
+    else -> emptyList()
 }
 
 /**
@@ -57,7 +77,7 @@ fun ToolPermission.runtimePermissions(): List<String> = when (this) {
     ToolPermission.CONTACTS -> listOf(Manifest.permission.READ_CONTACTS)
     ToolPermission.CALLS -> listOf(Manifest.permission.CALL_PHONE)
     ToolPermission.CALENDAR -> listOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
-    ToolPermission.VOICE_RECORDER -> listOf(Manifest.permission.RECORD_AUDIO)
+    ToolPermission.VOICE_RECORDER, ToolPermission.MICROPHONE -> listOf(Manifest.permission.RECORD_AUDIO)
     ToolPermission.LOCATION -> listOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
         Manifest.permission.ACCESS_COARSE_LOCATION

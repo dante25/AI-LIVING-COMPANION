@@ -116,6 +116,24 @@ interface MemoryManager {
     suspend fun archiveMemory(id: String, archived: Boolean): Result<Unit>
     suspend fun deleteMemory(id: String): Result<Unit>
     suspend fun updateImportance(id: String, importance: Int): Result<Unit>
+
+    // ── Review workflow ──
+    // Automatically extracted memories start as SUGGESTED and reach the prompt only once CONFIRMED.
+
+    /** SUGGESTED -> CONFIRMED. */
+    suspend fun confirmMemory(id: String): Result<Unit>
+
+    /** Dismisses (deletes) a SUGGESTED memory. */
+    suspend fun rejectMemory(id: String): Result<Unit>
+
+    /**
+     * Explicit user correction: marks [oldId] as CORRECTED and creates a new CONFIRMED memory
+     * with [newContent] that supersedes it. Returns the id of the new memory.
+     */
+    suspend fun correctMemory(oldId: String, newContent: String): Result<MemoryWriteResult>
+
+    /** Edits the text of a memory in place, keeping its status. */
+    suspend fun updateContent(id: String, newContent: String): Result<Unit>
     suspend fun deleteAll(): Result<Unit>
     suspend fun deleteSummariesForConversation(conversationId: String): Result<Unit>
 

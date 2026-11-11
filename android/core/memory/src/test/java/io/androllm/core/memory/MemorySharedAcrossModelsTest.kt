@@ -140,7 +140,7 @@ class MemorySharedAcrossModelsTest {
             isArchived = false, createdAt = 1000, updatedAt = 1000,
             accessCount = 0, lastAccessedAt = null, userId = "default",
             chatId = null, type = "LONG_TERM", summary = null, priority = 4,
-            lastUsedAt = null, expiryAt = null
+            lastUsedAt = null, expiryAt = null, status = "SUGGESTED"
         )
         // First write: nothing stored yet → insert.
         coEvery { memoryDao.getFilteredIds(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns emptyList()

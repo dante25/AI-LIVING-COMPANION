@@ -63,3 +63,29 @@ fun SoulState.afterIdle(minutes: Double): SoulState {
 /** Odmor (san): vraća energiju. */
 fun SoulState.rested(minutes: Double): SoulState =
     if (minutes > 0) adjusted(energy = 0.5 * minutes) else this
+
+/** Kratak opis raspoloženja riječima (bosanski), npr. "Dobro raspoložena, pomalo dosadno". */
+fun SoulState.describe(): String {
+    val head = when {
+        mood >= 75 -> "Odlično raspoložena"
+        mood >= 55 -> "Dobro raspoložena"
+        mood >= 35 -> "Onako, ni tamo ni ovamo"
+        else -> "Loše raspoložena"
+    }
+    val extras = buildList {
+        when {
+            anger >= 60 -> add("ljuta")
+            anger >= 40 -> add("malo namrgođena")
+        }
+        when {
+            energy < 20 -> add("jako pospana")
+            energy < 40 -> add("umorna")
+        }
+        when {
+            boredom >= 60 -> add("dosadno joj je")
+            boredom >= 35 -> add("pomalo dosadno")
+        }
+        if (attachment >= 70) add("privržena")
+    }.take(2)
+    return if (extras.isEmpty()) head else head + ", " + extras.joinToString(", ")
+}

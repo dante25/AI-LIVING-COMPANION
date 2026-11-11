@@ -426,6 +426,8 @@ fun SettingsScreen(
                     }
                 }
 
+                alexaAccordionItem(expandedGroup == SettingsGroup.Alexa.name, { toggleGroup(SettingsGroup.Alexa) }, searchQuery, settings.reduceMotion)
+
                 settingsAccordionItem(
                     group = SettingsGroup.Memory,
                     icon = Icons.Filled.Psychology,
@@ -452,7 +454,8 @@ fun SettingsScreen(
                         onRefreshStats = { viewModel.refreshMemoryStats() },
                         onInspectorClick = {
                             navController.navigate(io.androllm.core.navigation.Routes.DEVELOPER)
-                        }
+                        },
+                        onReviewClick = { navController.navigate(io.androllm.core.navigation.Routes.MEMORY_REVIEW) }
                     )
                 }
 
@@ -1190,7 +1193,8 @@ private fun MemorySettingsCard(
     onImport: () -> Unit,
     onDeleteAll: () -> Unit,
     onRefreshStats: () -> Unit,
-    onInspectorClick: () -> Unit
+    onInspectorClick: () -> Unit,
+    onReviewClick: () -> Unit
 ) {
     CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
         Column {
@@ -1365,6 +1369,7 @@ private fun MemorySettingsCard(
                     title = "Import memories",
                     onClick = onImport
                 )
+                SettingRow(icon = Icons.Filled.Memory, title = "Pregled memorije", onClick = onReviewClick)
                 SettingRow(
                     icon = Icons.Filled.Psychology,
                     title = "Memory Inspector",

@@ -45,10 +45,38 @@ class AndroLLMApplication : Application(), WorkConfiguration.Provider {
     @Inject
     lateinit var analyticsSyncTrigger: io.androllm.app.sync.AnalyticsSyncTrigger
 
+    @Inject
+    lateinit var sessionManager: io.androllm.core.permissions.SessionManager
+
+    @Inject
+    lateinit var voiceController: io.androllm.feature.voice.VoiceAssistantController
+
     override val workManagerConfiguration: WorkConfiguration
         get() = WorkConfiguration.Builder().setWorkerFactory(workerFactory).build()
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * Once a minute: ends the permission session after 15 min idle and stops the
+     * voice assistant service after 60 min without any activity. An in-progress
+     * voice turn counts as activity.
+     */
+    private val sessionHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val sessionTick = object : Runnable {
+        override fun run() {
+            runCatching {
+                val voiceState = voiceController.state.value
+                if (voiceState.active && voiceState.turnActive) sessionManager.touch()
+                if (sessionManager.tick() == io.androllm.core.permissions.IdleAction.STOP_SERVICE &&
+                    voiceState.active
+                ) {
+                    Timber.i("[Session] 60 min without activity — stopping voice assistant")
+                    io.androllm.feature.voice.VoiceAssistant.stop(this@AndroLLMApplication)
+                }
+            }.onFailure { Timber.w("[Session] tick failed: ${it.message}") }
+            sessionHandler.postDelayed(this, SESSION_TICK_MS)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -81,6 +109,8 @@ class AndroLLMApplication : Application(), WorkConfiguration.Provider {
         // debounced upload (~8s), so the dashboard reflects usage in <10s.
         runCatching { analyticsSyncTrigger.bind() }
             .onFailure { Timber.w("[AnalyticsSync] trigger bind failed: ${it.message}") }
+
+        sessionHandler.postDelayed(sessionTick, SESSION_TICK_MS)
 
         registerComponentCallbacks(object : ComponentCallbacks2 {
             override fun onTrimMemory(level: Int) {
@@ -140,5 +170,9 @@ class AndroLLMApplication : Application(), WorkConfiguration.Provider {
         }.onFailure { e ->
             Timber.w("[NPU] Could not seed ADSP_LIBRARY_PATH: ${e.message}")
         }
+    }
+
+    private companion object {
+        const val SESSION_TICK_MS = 60_000L
     }
 }

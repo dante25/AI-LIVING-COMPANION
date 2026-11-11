@@ -6,6 +6,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import io.androllm.core.permissions.PermissionHandler
+import io.androllm.core.permissions.SessionManager
+import io.androllm.core.tools.policy.ToolSessionState
 import io.androllm.core.permissions.handler.AccessibilityAccessHandler
 import io.androllm.core.permissions.handler.AlarmAccessHandler
 import io.androllm.core.permissions.handler.BluetoothPermissionHandler
@@ -37,4 +39,7 @@ abstract class PermissionModule {
     @Binds @IntoSet abstract fun bindLocation(handler: LocationPermissionHandler): PermissionHandler
     @Binds @IntoSet abstract fun bindBluetooth(handler: BluetoothPermissionHandler): PermissionHandler
     @Binds @IntoSet abstract fun bindAlarms(handler: AlarmAccessHandler): PermissionHandler
+
+    /** Lets core:tools consult the session without depending on this module. */
+    @Binds abstract fun bindToolSessionState(manager: SessionManager): ToolSessionState
 }

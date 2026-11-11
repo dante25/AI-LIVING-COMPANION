@@ -51,7 +51,7 @@ abstract class MemoryDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "memory.db"
-        const val VERSION = 3
+        const val VERSION = 4
 
         /**
          * v1 -> v2: memories gained an archived flag.
@@ -83,6 +83,19 @@ abstract class MemoryDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v3 -> v4: review workflow. Adds status (existing rows become CONFIRMED),
+         * supersedes_id (link from a corrected memory to the one it replaced) and
+         * source_message_id (message the memory was extracted from).
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE memory_entity ADD COLUMN status TEXT NOT NULL DEFAULT 'CONFIRMED'")
+                db.execSQL("ALTER TABLE memory_entity ADD COLUMN supersedes_id TEXT")
+                db.execSQL("ALTER TABLE memory_entity ADD COLUMN source_message_id TEXT")
+            }
+        }
+
         @Volatile
         private var instance: MemoryDatabase? = null
 
@@ -100,8 +113,7 @@ abstract class MemoryDatabase : RoomDatabase() {
                     // writes (insert + embeddings + summaries) never block the
                     // chat UI's readers.
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }

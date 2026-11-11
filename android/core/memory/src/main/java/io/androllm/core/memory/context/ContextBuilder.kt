@@ -31,6 +31,8 @@ class ContextBuilder @Inject constructor() {
         val hardenedHelper = try { io.androllm.core.memory.hardening.MemoryHardeningHelper() } catch (_: Exception) { null }
 
         val memList = memories
+            // Only user-confirmed memories may reach the prompt: suggestions await review, corrected ones are history.
+            .filter { it.memory.status == io.androllm.core.memory.MemoryStatus.CONFIRMED }
             .filter { !it.memory.isArchived }
             .filter { it.memory.expiryAt == null || it.memory.expiryAt > now }
             .filter { it.memory.content.isNotBlank() && it.memory.content.length <= 800 } // malformed guard

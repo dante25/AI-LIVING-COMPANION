@@ -260,7 +260,7 @@ class MemorySystemHardeningTest {
 
         // Second with similar content should dedup via exact match
         coEvery { memoryDao.getFilteredIds(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns listOf("someId")
-        val existing = MemoryEntity("someId", "PREFERENCES", "User prefers dark mode", createdAt = 0, updatedAt = 0)
+        val existing = MemoryEntity("someId", "PREFERENCES", "User prefers dark mode", createdAt = 0, updatedAt = 0, status = "SUGGESTED")
         coEvery { memoryDao.getByIds(any()) } returns listOf(existing)
         coEvery { memoryDao.getById("someId") } returns existing
         coEvery { tagDao.getTagNamesForMemory("someId") } returns emptyList()

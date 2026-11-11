@@ -76,4 +76,64 @@ class SoulTest {
         val hint = SoulEngine(MemoryStore()).promptHint(SoulAction.REFUSE)
         assertTrue(hint.contains("sigurnost"))
     }
+
+    @Test fun resetRestoresInitialStateAndPersists() {
+        val store = MemoryStore()
+        var now = 1_000_000L
+        val engine = SoulEngine(store, clock = { now })
+        engine.onUserMessage("glupa si")
+        assertTrue(engine.snapshot().anger > 0.0)
+        now += 5_000
+        engine.reset()
+        assertEquals(SoulState(), engine.snapshot())
+        assertEquals(SoulState(), store.saved!!.state)
+        assertEquals(now, store.saved!!.lastContactMillis)
+    }
+
+    @Test fun resetAllowsSameMessageToApplyAgain() {
+        var now = 1_000_000L
+        val engine = SoulEngine(MemoryStore(), clock = { now })
+        engine.onUserMessage("glupa si")
+        engine.reset()
+        now += 1_000
+        engine.onUserMessage("glupa si")
+        assertTrue(engine.snapshot().anger > 0.0)
+    }
+
+    @Test fun stateFlowFollowsMessagesAndReset() {
+        var now = 1_000_000L
+        val engine = SoulEngine(MemoryStore(), clock = { now })
+        assertEquals(SoulState(), engine.stateFlow.value)
+        engine.onUserMessage("super si")
+        assertEquals(engine.snapshot(), engine.stateFlow.value)
+        assertTrue(engine.stateFlow.value.mood > 60.0)
+        engine.reset()
+        assertEquals(SoulState(), engine.stateFlow.value)
+    }
+
+    @Test fun stateFlowStartsFromSavedState() {
+        val store = MemoryStore()
+        store.saved = SoulSnapshot(SoulState(mood = 12.0), 0L)
+        assertEquals(12.0, SoulEngine(store, clock = { 0L }).stateFlow.value.mood, 0.0001)
+    }
+
+    @Test fun settingsDefaultsAndApply() {
+        val engine = SoulEngine(MemoryStore())
+        assertTrue(engine.enabled)
+        assertEquals(DEFAULT_ALEXA_PERSONA, engine.persona)
+        engine.applySettings(AlexaSettings(personaOverride = "Budi ozbiljna.", soulEnabled = false))
+        assertEquals(false, engine.enabled)
+        assertEquals("Budi ozbiljna.", engine.persona)
+        engine.applySettings(AlexaSettings(personaOverride = "  ", soulEnabled = true))
+        assertEquals(DEFAULT_ALEXA_PERSONA, engine.persona)
+    }
+
+    @Test fun describeUsesWordsForMoodAndBoredom() {
+        assertEquals("Dobro raspoložena", SoulState().describe())
+        assertEquals(
+            "Dobro raspoložena, pomalo dosadno",
+            SoulState(boredom = 40.0).describe(),
+        )
+        assertTrue(SoulState(mood = 20.0, anger = 70.0).describe().startsWith("Loše raspoložena, ljuta"))
+    }
 }

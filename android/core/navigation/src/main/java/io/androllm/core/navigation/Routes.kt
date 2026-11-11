@@ -37,6 +37,9 @@ object Routes {
     /** Tool Debug: per-call execution log (prompt → tool → result → LLM output). */
     const val TOOL_DEBUG = "tool-debug"
 
+    /** Memorija: review of suggested / confirmed memories. */
+    const val MEMORY_REVIEW = "memory-review"
+
     const val ARG_CONVERSATION_ID = "conversationId"
     const val ARG_MODEL_ID = "modelId"
     const val ARG_PROMPT = "prompt"

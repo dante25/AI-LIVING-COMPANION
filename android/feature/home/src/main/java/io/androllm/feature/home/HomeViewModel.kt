@@ -7,6 +7,8 @@ import io.androllm.core.common.UiState
 import io.androllm.core.database.repository.ConversationRepository
 import io.androllm.core.database.repository.SettingsRepository
 import io.androllm.core.models.Conversation
+import io.androllm.core.soul.SoulEngine
+import io.androllm.core.soul.SoulState
 import io.androllm.core.telemetry.DeviceMetrics
 import io.androllm.core.telemetry.GenerationStat
 import io.androllm.core.telemetry.TelemetryRepository
@@ -33,8 +35,12 @@ import kotlinx.coroutines.launch
 class HomeViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val settingsRepository: SettingsRepository,
-    private val telemetryRepository: TelemetryRepository
+    private val telemetryRepository: TelemetryRepository,
+    soulEngine: SoulEngine
 ) : BaseViewModel() {
+
+    /** Stanje Alexine duše za karticu na početnom ekranu. */
+    val soulState: StateFlow<SoulState> = soulEngine.stateFlow
 
     private val _uiState = MutableStateFlow<UiState<HomeData>>(UiState.Loading())
     val uiState: StateFlow<UiState<HomeData>> = _uiState

@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:utils"))
     implementation(project(":core:accessibility"))
+    implementation(project(":core:tools"))
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("com.google.dagger:hilt-android:2.57.1")

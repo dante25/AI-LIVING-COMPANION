@@ -59,7 +59,11 @@ data class MemoryEntity(
     val summary: String? = null,
     @ColumnInfo(name = "priority") val priority: Int = 1,
     @ColumnInfo(name = "last_used_at") val lastUsedAt: Long? = null,
-    @ColumnInfo(name = "expiry_at") val expiryAt: Long? = null
+    @ColumnInfo(name = "expiry_at") val expiryAt: Long? = null,
+    // Review workflow (DB v4): SUGGESTED / CONFIRMED / CORRECTED, see MemoryStatus.
+    val status: String = "CONFIRMED",
+    @ColumnInfo(name = "supersedes_id") val supersedesId: String? = null,
+    @ColumnInfo(name = "source_message_id") val sourceMessageId: String? = null
 )
 
 /**

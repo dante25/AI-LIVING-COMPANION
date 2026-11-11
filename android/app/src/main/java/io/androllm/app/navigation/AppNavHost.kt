@@ -220,6 +220,8 @@ fun AppNavHost(
             ToolDebugScreen(navController = navController)
         }
 
+        composable(Routes.MEMORY_REVIEW) { io.androllm.feature.settings.MemoryReviewScreen(navController = navController) }
+
         composable(Routes.CLOUD_PROVIDERS) {
             io.androllm.feature.cloud.CloudProvidersScreen(navController = navController)
         }

@@ -24,6 +24,9 @@ object ExtractionPrompts {
         - Devices the user owns or develops for
         - Pinned facts: stable facts stated with certainty (e.g., "AndroLLM Cloud uses LiteLLM", "Tool calling should stay local")
         - Developer notes: technical decisions, gotchas, solutions
+        - RELATIONSHIP_MOMENT: shared jokes and nice moments between the user and the assistant companion
+        - RELATIONSHIP_CONFLICT: arguments or conflicts between the user and the assistant companion
+        - RELATIONSHIP_DISLIKE: things that bother or upset the assistant companion (what she dislikes)
         - Project-specific context when user says "Remember this project context"
 
         IGNORE — do NOT store (confidence gate: if temporary or low-value, return []):

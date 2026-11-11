@@ -41,6 +41,27 @@ class MigrationTest {
         db.close()
     }
 
+    @Test
+    fun migrate3To4_existingRowsBecomeConfirmed() {
+        helper.createDatabase(TEST_DB, 3).apply {
+            execSQL(
+                "INSERT INTO memory_entity (id, category, content, importance, created_at, updated_at) " +
+                    "VALUES ('m1', 'CUSTOM', 'hello', 1, 100, 100)"
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 4, true, MemoryDatabase.MIGRATION_3_4)
+
+        db.query("SELECT status, supersedes_id, source_message_id FROM memory_entity WHERE id = 'm1'").use { cursor ->
+            assertTrue("expected the migrated row", cursor.moveToFirst())
+            assertEquals("CONFIRMED", cursor.getString(0))
+            assertTrue(cursor.isNull(1))
+            assertTrue(cursor.isNull(2))
+        }
+        db.close()
+    }
+
     companion object {
         private const val TEST_DB = "migration-test"
     }

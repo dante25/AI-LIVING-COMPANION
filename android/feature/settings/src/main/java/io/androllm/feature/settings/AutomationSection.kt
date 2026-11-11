@@ -125,6 +125,10 @@ fun AutomationSection(
 
                 HorizontalDivider(color = MaterialTheme.ledger.deskHairline)
 
+                PermissionPolicyBlock(settings = settings, tools = tools, onUpdate = onUpdate)
+
+                HorizontalDivider(color = MaterialTheme.ledger.deskHairline)
+
                 AutoToggleRow(
                     icon = Icons.Filled.Mic,
                     title = "Voice confirmations",

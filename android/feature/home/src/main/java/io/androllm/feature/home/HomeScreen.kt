@@ -79,6 +79,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val telemetry by viewModel.telemetry.collectAsStateWithLifecycle()
+    val soul by viewModel.soulState.collectAsStateWithLifecycle()
     val data = (uiState as? UiState.Success)?.data ?: HomeData()
     val isLoading = uiState is UiState.Loading
 
@@ -221,6 +222,9 @@ fun HomeScreen(
                     }
                     }
                 }
+
+                // Alexa: raspoloženje riječima i trake stanja (iznad liste razgovora)
+                item { AlexaCard(soul = soul) }
 
                 // 7. Recent Conversations Activity Feed
                 item {

@@ -1,5 +1,9 @@
 package io.androllm.core.soul
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 /**
  * Duša: drži stanje, primjenjuje događaje i vrijeme, odlučuje o ponašanju i
  * pravi kratku uputu za model. Ne zna ništa o modelu, pa se model može mijenjati.
@@ -12,12 +16,43 @@ class SoulEngine(
     private var lastContact: Long
     private var lastText: String
     private var lastAction: SoulAction = SoulAction.RESPOND
+    private val _stateFlow: MutableStateFlow<SoulState>
+
+    /** Postavke iz ekrana "Alexa": duša uključena i tekst karaktera (prazan = podrazumijevani). */
+    @Volatile
+    var enabled: Boolean = true
+        private set
+
+    @Volatile
+    var persona: String = DEFAULT_ALEXA_PERSONA
+        private set
 
     init {
         val saved = store.load()
         state = saved?.state ?: SoulState()
         lastContact = saved?.lastContactMillis ?: clock()
         lastText = saved?.lastText ?: ""
+        _stateFlow = MutableStateFlow(state)
+    }
+
+    /** Trenutno stanje kao tok, za ekrane koji ga prikazuju. */
+    val stateFlow: StateFlow<SoulState> get() = _stateFlow.asStateFlow()
+
+    /** Primijeni postavke (poziva ih modul iz [AlexaSettingsStore]). */
+    fun applySettings(settings: AlexaSettings) {
+        enabled = settings.soulEnabled
+        persona = settings.persona
+    }
+
+    /** Vrati dušu na početno stanje (ne dira postavke). */
+    @Synchronized
+    fun reset() {
+        state = SoulState()
+        lastContact = clock()
+        lastText = ""
+        lastAction = SoulAction.RESPOND
+        _stateFlow.value = state
+        store.save(SoulSnapshot(state, lastContact, lastText))
     }
 
     /** Poruka korisnika: vrijeme prođe, primijeni se događaj, odluči se ponašanje. */
@@ -35,6 +70,7 @@ class SoulEngine(
         val event = classify(text)
         next = next.after(event)
         state = next
+        _stateFlow.value = next
         lastContact = now
         lastText = text
         lastAction = decide(next, event)

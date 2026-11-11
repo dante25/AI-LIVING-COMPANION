@@ -10,6 +10,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.androllm.core.tools.api.ToolPermission
+import io.androllm.core.tools.policy.PermissionPolicy
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +38,7 @@ class AutomationSettingsStore @Inject constructor(
         val VOICE_CONFIRMATIONS = booleanPreferencesKey("voice_confirmations")
         val MAX_TOOL_ROUNDS = intPreferencesKey("max_tool_rounds")
         val SHOW_TOOL_ACTIVITY = booleanPreferencesKey("show_tool_activity")
+        val PERMISSION_POLICIES = stringSetPreferencesKey("permission_policies")
     }
 
     private val dataStore: DataStore<Preferences> = context.toolsDataStore
@@ -50,7 +53,8 @@ class AutomationSettingsStore @Inject constructor(
             disabledTools = p[Keys.DISABLED_TOOLS] ?: defaults.disabledTools,
             voiceConfirmations = p[Keys.VOICE_CONFIRMATIONS] ?: defaults.voiceConfirmations,
             maxToolRounds = (p[Keys.MAX_TOOL_ROUNDS] ?: defaults.maxToolRounds).coerceIn(1, 6),
-            showToolActivity = p[Keys.SHOW_TOOL_ACTIVITY] ?: defaults.showToolActivity
+            showToolActivity = p[Keys.SHOW_TOOL_ACTIVITY] ?: defaults.showToolActivity,
+            permissionPolicies = decodePolicies(p[Keys.PERMISSION_POLICIES])
         )
     }
 
@@ -66,6 +70,7 @@ class AutomationSettingsStore @Inject constructor(
             p[Keys.VOICE_CONFIRMATIONS] = next.voiceConfirmations
             p[Keys.MAX_TOOL_ROUNDS] = next.maxToolRounds
             p[Keys.SHOW_TOOL_ACTIVITY] = next.showToolActivity
+            p[Keys.PERMISSION_POLICIES] = next.permissionPolicies.map { (k, v) -> "$k:${v.name}" }.toSet()
         }
     }
 
@@ -81,6 +86,17 @@ class AutomationSettingsStore @Inject constructor(
             )
         }
     }
+
+    suspend fun setPermissionPolicy(permission: ToolPermission, policy: PermissionPolicy) {
+        update { it.copy(permissionPolicies = it.permissionPolicies + (permission.name to policy)) }
+    }
+
+    private fun decodePolicies(raw: Set<String>?): Map<String, PermissionPolicy> =
+        raw.orEmpty().mapNotNull { entry ->
+            val key = entry.substringBefore(':', "")
+            val policy = runCatching { PermissionPolicy.valueOf(entry.substringAfter(':', "")) }.getOrNull()
+            if (key.isNotEmpty() && policy != null) key to policy else null
+        }.toMap()
 
     suspend fun setConfirmationMode(mode: ConfirmationMode) {
         update { it.copy(confirmationMode = mode) }

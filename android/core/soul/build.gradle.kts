@@ -42,5 +42,7 @@ android {
 dependencies {
     implementation("com.google.dagger:hilt-android:2.57.1")
     ksp("com.google.dagger:hilt-compiler:2.57.1")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    implementation("androidx.datastore:datastore-preferences:1.1.3")
     testImplementation("junit:junit:4.13.2")
 }

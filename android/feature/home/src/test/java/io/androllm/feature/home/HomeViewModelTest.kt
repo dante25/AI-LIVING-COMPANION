@@ -31,6 +31,10 @@ class HomeViewModelTest {
     private val conversationRepository: ConversationRepository = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val telemetryRepository: TelemetryRepository = mockk(relaxed = true)
+    private val soulEngine = io.androllm.core.soul.SoulEngine(object : io.androllm.core.soul.SoulStore {
+        override fun load(): io.androllm.core.soul.SoulSnapshot? = null
+        override fun save(snapshot: io.androllm.core.soul.SoulSnapshot) = Unit
+    })
 
     @Before
     fun setUp() {
@@ -53,7 +57,7 @@ class HomeViewModelTest {
         every { conversationRepository.observeRecent() } returns flowOf(emptyList())
         every { settingsRepository.observeSettings() } returns flowOf(AppSettings())
 
-        val viewModel = HomeViewModel(conversationRepository, settingsRepository, telemetryRepository)
+        val viewModel = HomeViewModel(conversationRepository, settingsRepository, telemetryRepository, soulEngine)
 
         val state = viewModel.uiState.value
         assertTrue(state is UiState.Success)
@@ -67,7 +71,7 @@ class HomeViewModelTest {
         every { conversationRepository.observeRecent() } returns flowOf(emptyList())
         every { settingsRepository.observeSettings() } returns flowOf(AppSettings())
 
-        HomeViewModel(conversationRepository, settingsRepository, telemetryRepository)
+        HomeViewModel(conversationRepository, settingsRepository, telemetryRepository, soulEngine)
 
         verify { telemetryRepository.startSampling() }
     }
@@ -77,7 +81,7 @@ class HomeViewModelTest {
         every { conversationRepository.observeRecent() } returns flowOf(emptyList())
         every { settingsRepository.observeSettings() } returns flowOf(AppSettings())
 
-        val viewModel = HomeViewModel(conversationRepository, settingsRepository, telemetryRepository)
+        val viewModel = HomeViewModel(conversationRepository, settingsRepository, telemetryRepository, soulEngine)
 
         val telemetry = viewModel.telemetry.value
         assertEquals(0f, telemetry.ramTotalMb)

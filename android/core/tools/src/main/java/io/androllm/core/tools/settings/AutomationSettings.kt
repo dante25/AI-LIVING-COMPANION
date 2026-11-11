@@ -1,5 +1,8 @@
 package io.androllm.core.tools.settings
 
+import io.androllm.core.tools.api.ToolPermission
+import io.androllm.core.tools.policy.PermissionPolicy
+
 /**
  * How strictly the assistant must confirm tool actions before executing them.
  */
@@ -32,8 +35,19 @@ data class AutomationSettings(
     /** Max planner→execute→re-plan rounds in one turn (loop guard) — hardened to 6 for stress-test workflows. */
     val maxToolRounds: Int = 5,
     /** Show tool activity chips in the chat stream. */
-    val showToolActivity: Boolean = true
+    val showToolActivity: Boolean = true,
+    /**
+     * Per-permission policy ([PermissionPolicy]) keyed by [ToolPermission.name].
+     * Missing entries fall back to [PermissionPolicy.effective]'s default.
+     * Sensitive actions (SMS, calls, e-mail, deleting) are confirmed by
+     * [confirmationMode] regardless of these policies.
+     */
+    val permissionPolicies: Map<String, PermissionPolicy> = emptyMap()
 ) {
+
+    /** Effective policy for [permission] (camera is never persistent). */
+    fun policyFor(permission: ToolPermission): PermissionPolicy =
+        PermissionPolicy.effective(permission, permissionPolicies[permission.name])
 
     /** True when the pipeline is on AND this tool is not user-blocked. */
     fun isToolEnabled(toolName: String): Boolean =

@@ -1,6 +1,7 @@
 package io.androllm.core.memory.model
 
 import io.androllm.core.memory.MemoryCategory
+import io.androllm.core.memory.MemoryStatus
 import io.androllm.core.memory.MemoryType
 
 /**
@@ -31,7 +32,11 @@ data class Memory(
     val summary: String? = null,
     val priority: Int = 1,
     val lastUsedAt: Long? = null,
-    val expiryAt: Long? = null
+    val expiryAt: Long? = null,
+    // Review workflow: only CONFIRMED memories are injected into prompts.
+    val status: MemoryStatus = MemoryStatus.CONFIRMED,
+    val supersedesId: String? = null,
+    val sourceMessageId: String? = null
 ) {
     // Keep priority/importance in sync — priority is canonical per spec
     val effectivePriority: Int get() = priority.coerceIn(1, 5).let { if (it == 1 && importance != 1) importance.coerceIn(1, 5) else it }
@@ -173,7 +178,9 @@ data class MemoryExchange(
     /** The most recent chat turns (role to content), oldest first. */
     val recentMessages: List<Pair<String, String>> = emptyList(),
     /** Total message count in the conversation (for summarization scheduling). */
-    val messageCount: Int = 0
+    val messageCount: Int = 0,
+    /** Id of the user message the extracted memories come from (stored as source_message_id). */
+    val sourceMessageId: String? = null
 )
 
 /**

@@ -111,6 +111,16 @@ interface MemoryDao {
         now: Long = 0L
     ): List<String>
 
+    /** Ids of memories with the given review status (see MemoryStatus). */
+    @Query("SELECT id FROM $MEMORY_ENTITY_TABLE WHERE status = :status")
+    suspend fun getIdsWithStatus(status: String): List<String>
+
+    @Query("SELECT COUNT(*) FROM $MEMORY_ENTITY_TABLE WHERE status = :status")
+    suspend fun countByStatus(status: String): Int
+
+    @Query("UPDATE $MEMORY_ENTITY_TABLE SET status = :status, updated_at = :now WHERE id = :id")
+    suspend fun updateStatus(id: String, status: String, now: Long): Int
+
     @Query("DELETE FROM $MEMORY_ENTITY_TABLE WHERE expiry_at IS NOT NULL AND expiry_at < :now")
     suspend fun deleteExpired(now: Long): Int
 
@@ -131,6 +141,7 @@ interface MemoryDao {
         """
         SELECT id FROM $MEMORY_ENTITY_TABLE
         WHERE id NOT IN (SELECT memory_id FROM $EMBEDDING_TABLE)
+          AND status != 'CORRECTED'
         """
     )
     suspend fun getMemoryIdsWithoutEmbeddings(): List<String>

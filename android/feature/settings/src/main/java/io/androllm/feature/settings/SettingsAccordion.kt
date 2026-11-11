@@ -61,6 +61,7 @@ internal const val SETTINGS_ACCORDION_DURATION_MS = 220
  */
 enum class SettingsGroup {
     Account,
+    Alexa,
     Appearance,
     Storage,
     Memory,
@@ -89,6 +90,7 @@ internal fun SettingsGroup.matches(query: String, extraKeywords: List<String> = 
 internal val SettingsGroup.title: String
     get() = when (this) {
         SettingsGroup.Account -> "Account & Sync"
+        SettingsGroup.Alexa -> "Alexa"
         SettingsGroup.Appearance -> "Appearance"
         SettingsGroup.Storage -> "Storage"
         SettingsGroup.Memory -> "Memory"
@@ -111,6 +113,9 @@ internal val SettingsGroup.keywords: List<String>
         SettingsGroup.Account -> listOf(
             "sign in", "google", "sync", "profile", "guest", "account", "firebase", "email",
             "web dashboard", "connect", "link", "analytics", "website"
+        )
+        SettingsGroup.Alexa -> listOf(
+            "alexa", "karakter", "persona", "duša", "dusa", "raspoloženje", "soul", "mood"
         )
         SettingsGroup.Appearance -> listOf(
             "text size", "density", "blur",

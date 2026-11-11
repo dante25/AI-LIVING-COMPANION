@@ -48,7 +48,7 @@ object ExtractionSchema {
               "content": { "type": "string" },
               "category": {
                 "type": "string",
-                "enum": ["IDENTITY","PREFERENCES","PROJECTS","GOALS","SKILLS","PROGRAMMING_LANGUAGES","FRAMEWORKS","DEVICES","PINNED_FACTS","DEVELOPER_NOTES","CUSTOM"]
+                "enum": ["IDENTITY","PREFERENCES","PROJECTS","GOALS","SKILLS","PROGRAMMING_LANGUAGES","FRAMEWORKS","DEVICES","PINNED_FACTS","DEVELOPER_NOTES","CUSTOM","RELATIONSHIP_MOMENT","RELATIONSHIP_CONFLICT","RELATIONSHIP_DISLIKE"]
               },
               "importance": { "type": "integer" },
               "tags": { "type": "array", "items": { "type": "string" } },
