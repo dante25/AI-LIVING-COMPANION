@@ -1,0 +1,1063 @@
+package io.androllm.feature.developer
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Troubleshoot
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import io.androllm.core.common.UiState
+import io.androllm.core.navigation.Routes
+import io.androllm.core.ui.components.CloudAdaptiveNavigation
+import io.androllm.core.ui.components.CloudAtmosphericBackground
+import io.androllm.core.ui.components.CloudBarChart
+import io.androllm.core.ui.components.CloudChip
+import io.androllm.core.ui.components.CloudGlassCard
+import io.androllm.core.ui.components.CloudLineChart
+import io.androllm.core.ui.components.CloudUsageBar
+import io.androllm.core.ui.components.DeveloperStatsCard
+import io.androllm.core.ui.components.SectionHeader
+import io.androllm.core.ui.components.StaggeredEntrance
+import io.androllm.core.ui.components.StatsCardSubStat
+import io.androllm.core.ui.components.StatsDeltaTone
+import io.androllm.core.ui.components.bounceClick
+import io.androllm.core.runtime.Runtime
+import io.androllm.core.runtime.RuntimeStatus
+import io.androllm.core.ui.theme.LampGlow
+import io.androllm.engine.api.EngineState
+import io.androllm.engine.backend.BackendCapabilities
+import io.androllm.engine.models.BackendBenchmarkResult
+import io.androllm.core.ui.theme.ledger
+
+/**
+ * Developer Mode — the desk's diagnostic drawer. Every chart is backed by
+ * session telemetry from the native engine and the device.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DeveloperScreen(
+    navController: NavController,
+    viewModel: DeveloperViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val debugInfo by viewModel.debugInfo.collectAsStateWithLifecycle()
+    val memoryStats by viewModel.memoryStats.collectAsStateWithLifecycle()
+    val recentMemories by viewModel.recentMemories.collectAsStateWithLifecycle()
+    val runtimeStatuses by viewModel.runtimeStatuses.collectAsStateWithLifecycle()
+    val systemMemory by viewModel.systemMemory.collectAsStateWithLifecycle()
+    val backendCapabilities by viewModel.backendCapabilities.collectAsStateWithLifecycle()
+    val backendBenchmark by viewModel.backendBenchmark.collectAsStateWithLifecycle()
+    val isBenchmarking by viewModel.isBenchmarking.collectAsStateWithLifecycle()
+    val data = (uiState as? UiState.Success)?.data ?: DeveloperData()
+
+    CloudAtmosphericBackground {
+        CloudAdaptiveNavigation(
+            currentRoute = Routes.DEVELOPER,
+            onTabSelected = { tab -> if (tab.route != Routes.DEVELOPER) navController.navigate(tab.route) },
+            topBar = {
+                TopAppBar(
+                    modifier = Modifier.statusBarsPadding(),
+                    title = {
+                        Column {
+                            Text(
+                                text = "Developer Mode",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.ledger.deskPaper
+                                )
+                            )
+                            Text(
+                                text = "Live engine & device telemetry",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.ledger.lampDeep,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.refresh() }) {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = MaterialTheme.ledger.deskInk)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            }
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Session stats hero — throughput, totals, backend, load chart.
+                item {
+                    StaggeredEntrance(index = 0) {
+                        SessionStatsHero(data = data)
+                    }
+                }
+
+                // Device & engine summary
+                item {
+                    StaggeredEntrance(index = 1) {
+                        DeviceSummaryCard(data = data)
+                    }
+                }
+
+                // Tool execution log entry point
+                item {
+                    StaggeredEntrance(index = 2) {
+                        CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .bounceClick { navController.navigate(Routes.TOOL_DEBUG) }
+                                    .padding(vertical = 16.dp, horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Bolt,
+                                contentDescription = null,
+                                tint = MaterialTheme.ledger.lampGlow,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Tool Execution Log",
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.ledger.deskPaper
+                                    )
+                                )
+                                Text(
+                                    text = "Every automation call: prompt → tool → result → LLM output",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = MaterialTheme.ledger.deskInk
+                                    )
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.ledger.deskInk
+                            )
+                        }
+                    }
+                    }
+                }
+
+                // Throughput
+                item {
+                    StaggeredEntrance(index = 3) {
+                        ChartCard(
+                            title = "Inference Throughput",
+                            liveValue = "${String.format("%.1f", data.lastTokensPerSecond)} tok/s",
+                            subtitle = "Peak ${String.format("%.1f", data.peakTokensPerSecond)} • Avg ${String.format("%.1f", data.avgTokensPerSecond)} • ${data.speedHistory.size} samples"
+                        ) {
+                            CloudLineChart(
+                                dataPoints = data.speedHistory.ifEmpty { listOf(0f, 0f) },
+                                accent = MaterialTheme.ledger.lampGlow,
+                                height = 120.dp
+                            )
+                        }
+                    }
+                }
+
+                // RAM pressure
+                item {
+                    StaggeredEntrance(index = 4) {
+                        ChartCard(
+                            title = "RAM Pressure",
+                            liveValue = "${data.history.lastOrNull()?.ramUsedMb?.toInt() ?: 0} MB",
+                            subtitle = "of ${data.deviceMetrics?.totalRamMb ?: 0} MB device RAM"
+                        ) {
+                            CloudLineChart(
+                                dataPoints = data.ramHistory.ifEmpty { listOf(0f, 0f) },
+                                accent = MaterialTheme.ledger.lampAmber,
+                                height = 110.dp
+                            )
+                        }
+                    }
+                }
+
+                // GPU & KV cache
+                item {
+                    StaggeredEntrance(index = 5) {
+                        ChartCard(
+                        title = "GPU & KV Cache",
+                        liveValue = data.memoryStats?.let { "${it.gpuMemoryMb().toInt()} MB GPU" } ?: "—",
+                        subtitle = data.memoryStats?.let { "${it.contextSizeMb().toInt()} MB KV cache • ${it.gpuBufferCount} buffers" } ?: "Idle — load a model"
+                    ) {
+                        Column {
+                            CloudLineChart(
+                                dataPoints = data.gpuHistory.ifEmpty { listOf(0f, 0f) },
+                                accent = MaterialTheme.ledger.lampGlow,
+                                height = 90.dp
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            // KV cache as a real share of total native memory
+                            // (model + context), not an arbitrary fraction.
+                            val totalNativeMb = data.memoryStats?.totalNativeMb() ?: 0f
+                            CloudUsageBar(
+                                label = "KV cache",
+                                valueText = "${data.memoryStats?.contextSizeMb()?.toInt() ?: 0} MB of ${totalNativeMb.toInt()} MB native",
+                                fraction = if (totalNativeMb > 0f) {
+                                    (data.memoryStats?.contextSizeMb() ?: 0f) / totalNativeMb
+                                } else 0f,
+                                accent = MaterialTheme.ledger.lampAmber
+                            )
+                        }
+                    }
+                    }
+                }
+
+                // Context window
+                item {
+                    StaggeredEntrance(index = 6) {
+                        CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Context Window",
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.ledger.deskPaper
+                                    )
+                                )
+                                Text(
+                                    text = "${data.contextTokensUsed} / ${data.contextLength} tokens",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = if (data.contextUsageFraction > 0.85f) MaterialTheme.ledger.emberRed else MaterialTheme.ledger.lampGlow,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            CloudUsageBar(
+                                label = "Used",
+                                valueText = "${(data.contextUsageFraction * 100).toInt()}%",
+                                fraction = data.contextUsageFraction,
+                                accent = if (data.contextUsageFraction > 0.85f) MaterialTheme.ledger.emberRed else MaterialTheme.ledger.lampGlow
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val promptTokens = data.lastStats?.promptTokens ?: 0L
+                            val generatedTokens = data.lastStats?.generatedTokens ?: 0L
+                            Text(
+                                text = "Last generation: $promptTokens prompt + $generatedTokens generated tokens",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.ledger.deskInk
+                                )
+                            )
+                        }
+                    }
+                    }
+                }
+
+                // Generation history
+                item {
+                    StaggeredEntrance(index = 7) {
+                        Column {
+                        SectionHeader(
+                        title = "Generation History",
+                        subtitle = "${data.generations.size} runs this session"
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Column {
+                            Text(
+                                text = "Latency per generation (ms)",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.ledger.deskInk
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            CloudBarChart(
+                                values = data.generationLatencies.ifEmpty { listOf(0f, 0f) },
+                                accent = MaterialTheme.ledger.lampGlow,
+                                height = 110.dp
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "Tokens/sec per generation",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.ledger.deskInk
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            CloudBarChart(
+                                values = data.generationSpeeds.ifEmpty { listOf(0f, 0f) },
+                                accent = MaterialTheme.ledger.lampAmber,
+                                height = 110.dp
+                            )
+                        }
+                    }
+                        }
+                    }
+                }
+
+                // Backend diagnostics
+                item {
+                    StaggeredEntrance(index = 8) {
+                        BackendDiagnosticsCard(
+                            data = data,
+                            onRefresh = { viewModel.refreshDebugInfo() },
+                            debugInfo = debugInfo,
+                            systemMemory = systemMemory
+                        )
+                    }
+                }
+
+                // Benchmark Backends — identical prompt through CPU / GPU / NPU
+                item {
+                    StaggeredEntrance(index = 9) {
+                        BenchmarkBackendsCard(
+                            capabilities = backendCapabilities,
+                            results = backendBenchmark,
+                            isBenchmarking = isBenchmarking,
+                            onRun = { viewModel.runBackendBenchmark() }
+                        )
+                    }
+                }
+
+                // Memory Inspector
+                item {
+                    StaggeredEntrance(index = 10) {
+                        Column {
+                        SectionHeader(
+                        title = "Memory Inspector",
+                        subtitle = "On-device memory pipeline"
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    MemoryInspectorCard(
+                        stats = memoryStats,
+                        recentMemories = recentMemories,
+                        onRefresh = { viewModel.refreshMemoryInspector() }
+                    )
+                        }
+                    }
+                }
+
+                // Runtime Registry — every app runtime, auto-discovered
+                item {
+                    StaggeredEntrance(index = 11) {
+                        Column {
+                        SectionHeader(
+                            title = "Runtime Registry",
+                            subtitle = "Every app runtime, auto-discovered — failures stay isolated"
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        RuntimeRegistryCard(
+                            runtimes = runtimeStatuses,
+                            onRefresh = { viewModel.refreshRuntimes() }
+                        )
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionStatsHero(data: DeveloperData) {
+    val samples = data.speedHistory
+    val hasSamples = samples.any { it > 0f }
+    val last = data.lastTokensPerSecond
+    val diff = last - data.avgTokensPerSecond
+    val totalTokens = data.generations.sumOf { it.totalTokens }
+    val ramUsedMb = data.history.lastOrNull()?.ramUsedMb?.toInt() ?: 0
+    val ramTotalMb = data.deviceMetrics?.totalRamMb ?: 0L
+    val peak = data.peakTokensPerSecond.takeIf { it > 0f } ?: 1f
+
+    DeveloperStatsCard(
+        title = "Session Stats",
+        timeFrame = "This session",
+        heroLabel = "Throughput",
+        heroValue = if (hasSamples) "${String.format("%.1f", last)} tok/s" else "—",
+        heroDelta = if (hasSamples) {
+            "${if (diff >= 0) "+" else "-"}${String.format("%.1f", kotlin.math.abs(diff))} tok/s vs avg"
+        } else {
+            "Load a model to begin"
+        },
+        heroDeltaTone = if (!hasSamples) {
+            StatsDeltaTone.NEUTRAL
+        } else if (diff >= 0) {
+            StatsDeltaTone.UP
+        } else {
+            StatsDeltaTone.DOWN
+        },
+        subStats = listOf(
+            StatsCardSubStat(
+                value = formatCompactTokens(totalTokens),
+                label = "tokens",
+                subLabel = "${data.generations.size} generations"
+            ),
+            StatsCardSubStat(
+                value = "$ramUsedMb",
+                label = "MB RAM",
+                subLabel = "of $ramTotalMb MB"
+            )
+        ),
+        rankTitle = if (data.isModelLoaded) data.backendLabel.uppercase() else "No backend",
+        rankSubtitle = if (data.isModelLoaded) {
+            buildString {
+                append(data.modelName.ifBlank { "Model loaded" })
+                data.memoryStats?.gpuLayersDisplay?.let { append(" · $it") }
+            }
+        } else {
+            "Load a model to light the desk"
+        },
+        chartTitle = "Session load",
+        bars = samples.takeLast(24).map { sample ->
+            val fraction = (sample / peak).coerceIn(0f, 1f)
+            if (sample > 0f && fraction < 0.06f) 0.06f else fraction
+        },
+        chartLabel = "${samples.size} samples this session"
+    )
+}
+
+private fun formatCompactTokens(n: Long): String = when {
+    n >= 1_000_000L -> "${String.format("%.1f", n / 1_000_000.0)}M"
+    n >= 1_000L -> "${String.format("%.1f", n / 1_000.0)}k"
+    else -> n.toString()
+}
+
+@Composable
+private fun DeviceSummaryCard(data: DeveloperData) {
+    CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Troubleshoot,
+                contentDescription = null,
+                tint = MaterialTheme.ledger.lampGlow,
+                modifier = Modifier.size(32.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = data.modelName.ifBlank { "No model loaded" },
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.ledger.deskPaper
+                    )
+                )
+                Text(
+                    text = buildString {
+                        append(data.deviceMetrics?.deviceModel ?: "Device")
+                        append(" • Android ${data.deviceMetrics?.androidVersion ?: "?"}")
+                        append(" • ${data.deviceMetrics?.cpuCores ?: 0} cores")
+                    },
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = MaterialTheme.ledger.deskInk
+                    )
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                CloudChip(
+                    text = "Backend ${data.backendLabel}",
+                    accentColor = if (data.backendLabel.contains("VULKAN", ignoreCase = true)) MaterialTheme.ledger.lampGlow else MaterialTheme.ledger.lampAmber,
+                    icon = Icons.Filled.Bolt
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                CloudChip(
+                    text = when (data.engineState) {
+                        is EngineState.Ready -> "● Ready"
+                        is EngineState.Generating -> "● Generating"
+                        is EngineState.Loading -> "Loading…"
+                        is EngineState.WarmingUp -> "Warming up…"
+                        EngineState.Unloading -> "Unloading…"
+                        is EngineState.Failed -> "● Error"
+                        EngineState.Unloaded -> "Idle"
+                    },
+                    accentColor = when (data.engineState) {
+                        is EngineState.Ready, is EngineState.Generating -> MaterialTheme.ledger.lampGlow
+                        is EngineState.Failed -> MaterialTheme.ledger.emberRed
+                        else -> MaterialTheme.ledger.lampDeep
+                    },
+                    icon = Icons.Filled.Memory
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChartCard(
+    title: String,
+    liveValue: String,
+    subtitle: String,
+    content: @Composable () -> Unit
+) {
+    CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.ledger.deskPaper
+                        )
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.ledger.deskInk
+                        )
+                    )
+                }
+                Text(
+                    text = liveValue,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.ledger.lampAmber
+                    )
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun BackendDiagnosticsCard(
+    data: DeveloperData,
+    debugInfo: io.androllm.engine.models.EngineDebugInfo?,
+    systemMemory: SystemMemoryInfo?,
+    onRefresh: () -> Unit
+) {
+    CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Backend Diagnostics",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.ledger.deskPaper
+                    )
+                )
+                IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Filled.Speed, contentDescription = "Refresh diagnostics", tint = MaterialTheme.ledger.deskInk, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            val info = debugInfo
+            DiagRow("Backend", data.backendLabel)
+            DiagRow("GPU", info?.gpuName?.ifBlank { data.memoryStats?.gpuName } ?: "—")
+            DiagRow("GPU layers", info?.let { "${it.gpuLayers}/${it.totalLayers}" } ?: data.memoryStats?.gpuLayersDisplay ?: "—")
+            DiagRow("Threads", info?.nThreads?.takeIf { it > 0 }?.toString() ?: data.deviceMetrics?.cpuCores?.toString() ?: "—")
+            DiagRow("KV type", info?.kvType ?: "—")
+            DiagRow("Flash attention", info?.flashAttn ?: "—")
+            DiagRow("Sampler", info?.sampler ?: "—")
+            DiagRow("First token latency", info?.firstTokenMs?.takeIf { it > 0 }?.let { "${it} ms" } ?: "—")
+            DiagRow("Stop reason", data.lastStats?.stopReason ?: "—")
+            DiagRow("Total inference", data.lastStats?.totalTimeMs?.let { "${it} ms" } ?: "—")
+            DiagRow("Prompt tokens", data.lastStats?.promptTokens?.toString() ?: "—")
+            DiagRow("Generated tokens", data.lastStats?.generatedTokens?.toString() ?: "—")
+            DiagRow("Chat template", info?.let { if (it.templateReady) "Ready" else "Unavailable" } ?: "—")
+
+            // System RAM + native heap: the budgets the pre-load resource guard
+            // actually checks (llama.cpp memory is native, not Java heap).
+            androidx.compose.material3.HorizontalDivider(
+                modifier = Modifier.padding(vertical = 6.dp),
+                color = MaterialTheme.ledger.deskInk.copy(alpha = 0.15f)
+            )
+            DiagRow(
+                "System RAM",
+                systemMemory?.let {
+                    "${it.totalRamMb()} MB total • ${it.availableRamMb()} MB free" + if (it.lowMemory) " • LOW" else ""
+                } ?: "—"
+            )
+            DiagRow(
+                "Native heap",
+                systemMemory?.let { "${it.nativeHeapAllocatedMb()} MB of ${it.nativeHeapSizeMb()} MB" } ?: "—"
+            )
+            DiagRow(
+                "Model RAM estimate",
+                data.memoryStats?.let {
+                    "${it.modelSizeMb().toInt()} MB weights + ${it.contextSizeMb().toInt()} MB KV"
+                } ?: "—"
+            )
+        }
+    }
+}
+
+@Composable
+private fun BenchmarkBackendsCard(
+    capabilities: BackendCapabilities,
+    results: List<BackendBenchmarkResult>?,
+    isBenchmarking: Boolean,
+    onRun: () -> Unit
+) {
+    CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Speed,
+                    contentDescription = null,
+                    tint = MaterialTheme.ledger.lampGlow,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Benchmark Backends",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.ledger.deskPaper
+                        )
+                    )
+                    Text(
+                        text = "Identical prompt through ${availableBackendsLabel(capabilities)}",
+                        style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.ledger.deskInk)
+                    )
+                }
+                if (results == null && !isBenchmarking) {
+                    Button(onClick = onRun) {
+                        Text("Run")
+                    }
+                } else if (isBenchmarking) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.ledger.lampGlow
+                    )
+                }
+            }
+
+            if (isBenchmarking) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Reloading the model on each backend…",
+                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.ledger.deskInk)
+                )
+            }
+
+            results?.let { list ->
+                Spacer(modifier = Modifier.height(12.dp))
+                if (list.isEmpty()) {
+                    Text(
+                        text = "No model loaded — load a model first, then run the comparison.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.ledger.deskInk)
+                    )
+                } else {
+                    list.forEachIndexed { index, r ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = buildString {
+                                        append(r.backendLabel)
+                                        r.vendor.takeIf { it.isNotBlank() }?.let { append(" · $it") }
+                                        r.accelerator.takeIf { it.isNotBlank() }?.let { append(" · $it") }
+                                    },
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.ledger.deskPaper
+                                    )
+                                )
+                                Text(
+                                    text = if (r.succeeded) {
+                                        buildString {
+                                            append("init ${r.initTimeMs} ms")
+                                            if (r.firstTokenMs > 0) append(" · first token ${r.firstTokenMs} ms")
+                                            if (r.peakRamMb > 0f) append(" · peak ${String.format("%.0f", r.peakRamMb)} MB")
+                                        }
+                                    } else {
+                                        "failed: ${r.error}"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.ledger.deskInk),
+                                    maxLines = 2,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = if (r.succeeded) {
+                                    String.format("%.1f tok/s", r.averageTokensPerSecond)
+                                } else {
+                                    "—"
+                                },
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (r.succeeded) MaterialTheme.ledger.lampGlow else MaterialTheme.ledger.emberRed
+                                )
+                            )
+                        }
+                        if (index < list.lastIndex) {
+                            androidx.compose.material3.HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                color = MaterialTheme.ledger.deskInk.copy(alpha = 0.15f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun availableBackendsLabel(caps: BackendCapabilities): String {
+    val parts = buildList {
+        if (caps.npuUsable) add("NPU")
+        if (caps.gpuAvailable) add("GPU")
+        add("CPU")
+    }
+    return parts.joinToString(" / ")
+}
+
+@Composable
+private fun MemoryInspectorCard(
+    stats: io.androllm.core.memory.model.MemoryInspectorStats?,
+    recentMemories: List<io.androllm.core.memory.model.Memory>,
+    onRefresh: () -> Unit
+) {
+    CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Memory Store",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.ledger.deskPaper
+                    )
+                )
+                IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh memory inspector", tint = MaterialTheme.ledger.deskInk, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            if (stats == null) {
+                Text(
+                    text = "Memory system is idle — enable it in Settings.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.ledger.deskInk)
+                )
+            } else {
+                if (!stats.enabled) {
+                    Text(
+                        text = "Disabled in Settings",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.ledger.lampAmber,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Counts
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    StatMini("Memories", stats.memoryCount.toString(), Modifier.weight(1f))
+                    StatMini("Embeddings", stats.embeddingCount.toString(), Modifier.weight(1f))
+                    StatMini("Vectors", stats.vectorCount.toString(), Modifier.weight(1f))
+                    StatMini("Summaries", stats.summaryCount.toString(), Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    StatMini("Projects", stats.projectCount.toString(), Modifier.weight(1f))
+                    StatMini("Tags", stats.tagCount.toString(), Modifier.weight(1f))
+                    StatMini("Links", stats.relationshipCount.toString(), Modifier.weight(1f))
+                    StatMini("Extractions", stats.totalExtractions.toString(), Modifier.weight(1f))
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                DiagRow("Avg retrieval", "${stats.avgRetrievalMs} ms")
+                DiagRow("Last retrieval", "${stats.lastRetrievalMs} ms")
+                DiagRow("Last embedding", "${stats.lastEmbeddingMs} ms")
+                DiagRow("Last extraction", "${stats.lastExtractionMs} ms")
+                DiagRow("Inserted / Updated", "${stats.totalInserted} / ${stats.totalUpdated}")
+                DiagRow("Similarity threshold", "${(stats.similarityThreshold * 100).toInt()}%")
+                DiagRow("Retrieved per prompt", stats.retrievalCount.toString())
+                DiagRow(
+                    "Embedding model",
+                    if (stats.embeddingModelPath.isNotBlank()) {
+                        stats.embeddingModelPath.substringAfterLast('/')
+                            .ifBlank { stats.embeddingModelPath }
+                    } else {
+                        "Not configured"
+                    }
+                )
+                DiagRow(
+                    "Model status",
+                    if (stats.embeddingModelLoaded) "Loaded (dim ${stats.embeddingDimension})" else "Not loaded"
+                )
+
+                // Context preview
+                if (recentMemories.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Context preview (most recent)",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.ledger.deskInk
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    for (memory in recentMemories) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = memory.category.name.take(4).uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.ledger.lampGlow,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                modifier = Modifier.width(44.dp)
+                            )
+                            Text(
+                                text = memory.content.take(80),
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.ledger.deskPaper),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (memory.isPinned) {
+                                Text(
+                                    text = "PIN",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = MaterialTheme.ledger.lampAmber,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Extraction logs
+                if (stats.logs.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Extraction logs",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.ledger.deskInk
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    for (entry in stats.logs.take(8)) {
+                        Text(
+                            text = entry.message.take(120),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = when (entry.level) {
+                                    io.androllm.core.memory.model.MemoryLogLevel.ERROR -> MaterialTheme.ledger.emberRed
+                                    io.androllm.core.memory.model.MemoryLogLevel.WARN -> MaterialTheme.ledger.lampAmber
+                                    else -> MaterialTheme.ledger.deskInk
+                                }
+                            ),
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RuntimeRegistryCard(
+    runtimes: List<Pair<Runtime, RuntimeStatus>>,
+    onRefresh: () -> Unit
+) {
+    CloudGlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Registered Runtimes",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.ledger.deskPaper
+                    )
+                )
+                IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh runtimes", tint = MaterialTheme.ledger.deskInk, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            if (runtimes.isEmpty()) {
+                Text(
+                    text = "Collecting runtime status…",
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.ledger.deskInk)
+                )
+            } else {
+                runtimes.forEachIndexed { index, (runtime, status) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 7.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = runtime.displayName,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.ledger.deskPaper
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                CloudChip(
+                                    text = runtime.category.displayName,
+                                    accentColor = MaterialTheme.ledger.lampDeep
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = status.summary,
+                                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.ledger.deskInk)
+                            )
+                            status.detail?.let {
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.ledger.deskInk),
+                                    maxLines = 2,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = if (status.available) "● Ready" else "● Off",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = if (status.available) MaterialTheme.ledger.lampGlow else MaterialTheme.ledger.deskInk
+                            )
+                        )
+                    }
+                    if (index < runtimes.lastIndex) {
+                        androidx.compose.material3.HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.ledger.deskInk.copy(alpha = 0.15f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatMini(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.ledger.lampAmber
+            )
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.ledger.deskInk),
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun DiagRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.ledger.deskInk
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.ledger.deskPaper
+        )
+    }
+}

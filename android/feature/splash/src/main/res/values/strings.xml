@@ -1,0 +1,4 @@
+<resources>
+    <string name="splash_loading">Initializing…</string>
+    <string name="splash_tagline">Private AI. Powered by You.</string>
+</resources>

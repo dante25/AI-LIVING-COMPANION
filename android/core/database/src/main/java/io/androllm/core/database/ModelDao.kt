@@ -1,0 +1,97 @@
+package io.androllm.core.database
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
+
+/**
+ * Data access object for models.
+ */
+@Dao
+interface ModelDao {
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(model: ModelEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(models: List<ModelEntity>)
+
+    @Update
+    suspend fun update(model: ModelEntity)
+
+    @Delete
+    suspend fun delete(model: ModelEntity)
+
+    @Query("DELETE FROM models WHERE id = :id")
+    suspend fun deleteById(id: String): Int
+    @Query("DELETE FROM models")
+    suspend fun deleteAll(): Int
+    @Query("SELECT * FROM models WHERE id = :id")
+    fun observeById(id: String): Flow<ModelEntity?>
+
+    @Query("SELECT * FROM models ORDER BY name ASC")
+    fun observeAll(): Flow<List<ModelEntity>>
+
+    @Query("SELECT * FROM models WHERE is_downloaded = 1 ORDER BY name ASC")
+    fun observeDownloaded(): Flow<List<ModelEntity>>
+
+    @Query("SELECT * FROM models WHERE id = :id")
+    suspend fun getById(id: String): ModelEntity?
+
+    @Query("SELECT * FROM models ORDER BY name ASC")
+    suspend fun getAll(): List<ModelEntity>
+
+    @Query("SELECT * FROM models WHERE is_downloaded = 1 ORDER BY name ASC")
+    suspend fun getDownloaded(): List<ModelEntity>
+
+    @Query("SELECT COUNT(*) FROM models WHERE id = :id")
+    suspend fun existsById(id: String): Boolean
+
+    @Query("SELECT COUNT(*) FROM models")
+    suspend fun count(): Int
+
+    @Query("UPDATE models SET is_loaded = :isLoaded, status = :status, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateLoadState(id: String, isLoaded: Boolean, status: String, updatedAt: Long): Int
+    @Query("UPDATE models SET is_downloaded = :isDownloaded, download_status = :downloadStatus, file_path = :filePath, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateDownloadState(
+        id: String,
+        isDownloaded: Boolean,
+        downloadStatus: String,
+        filePath: String?,
+        updatedAt: Long
+    ): Int
+    @Query("UPDATE models SET architecture = :architecture, quantization = :quantization, context_length = :contextLength, license = :license, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateDownloadMetadata(
+        id: String,
+        architecture: String,
+        quantization: String,
+        contextLength: Int,
+        license: String,
+        updatedAt: Long
+    ): Int
+    @Query("UPDATE models SET is_favorite = :isFavorite WHERE id = :id")
+    suspend fun updateFavorite(id: String, isFavorite: Boolean): Int
+    @Query("UPDATE models SET is_default = 0")
+    suspend fun clearDefaults(): Int
+    @Query("UPDATE models SET is_default = 1 WHERE id = :id")
+    suspend fun setDefault(id: String): Int
+    @Query("UPDATE models SET name = :name, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateName(id: String, name: String, updatedAt: Long): Int
+    @Query("UPDATE models SET last_used_date = :timestamp WHERE id = :id")
+    suspend fun updateLastUsed(id: String, timestamp: Long): Int
+    /**
+     * Self-healing metadata: persists the real on-disk / on-server byte size.
+     * Used instead of deleting a model when the catalog size turns out stale.
+     */
+    @Query("UPDATE models SET file_size = :fileSize, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateFileSize(id: String, fileSize: Long, updatedAt: Long): Int
+    @Query("SELECT * FROM models WHERE is_default = 1 LIMIT 1")
+    suspend fun getDefaultModel(): ModelEntity?
+
+    @Query("SELECT * FROM models WHERE name LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%' ORDER BY name ASC")
+    fun searchModels(query: String): Flow<List<ModelEntity>>
+}

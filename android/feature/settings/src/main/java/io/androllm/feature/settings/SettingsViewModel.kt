@@ -1,0 +1,981 @@
+package io.androllm.feature.settings
+
+import android.content.Context
+import android.net.Uri
+import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.androllm.core.common.BaseViewModel
+import io.androllm.core.common.UiState
+import io.androllm.core.common.onError
+import io.androllm.core.common.onSuccess
+import io.androllm.core.datastore.PreferencesDataStore
+import io.androllm.core.database.repository.SettingsRepository
+import io.androllm.core.memory.MemoryManager
+import io.androllm.core.memory.model.MemoryInspectorStats
+import io.androllm.core.memory.model.MemorySettings
+import io.androllm.core.models.ChatFontSize
+import io.androllm.core.models.ThemeMode
+import io.androllm.core.models.UiDensity
+import io.androllm.core.utils.LogUtils
+import io.androllm.core.utils.ShareUtils
+import io.androllm.core.utils.StorageUtils
+import io.androllm.core.voice.VoiceSettingsStore
+import io.androllm.core.voice.model.VoiceSettings
+import io.androllm.core.mcp.McpConnectionManager
+import io.androllm.core.mcp.McpServer
+import io.androllm.core.mcp.McpSettingsStore
+import io.androllm.core.voice.stt.WhisperModel
+import io.androllm.core.database.repository.ModelRepository
+import io.androllm.engine.api.EngineRepository
+import io.androllm.engine.api.EngineState
+import io.androllm.engine.backend.BackendSelector
+import io.androllm.engine.models.BackendType
+import io.androllm.core.tools.registry.ToolRegistry
+import io.androllm.core.tools.settings.AutomationSettings
+import io.androllm.core.tools.settings.AutomationSettingsStore
+import io.androllm.core.tools.settings.ConfirmationMode
+import io.androllm.core.accessibility.AccessibilityAutomationService
+import io.androllm.core.accessibility.controller.AccessibilityController
+import io.androllm.core.accessibility.settings.AccessibilitySettings
+import io.androllm.core.accessibility.settings.AccessibilitySettingsStore
+import io.androllm.core.voice.stt.WhisperModelManager
+import io.androllm.core.voice.stt.WhisperModels
+import io.androllm.core.voice.stt.WhisperSpeechRecognizer
+import io.androllm.feature.voice.VoiceAssistant
+import io.androllm.feature.voice.VoiceAssistantController
+import io.androllm.feature.voice.ui.OverlayPermission
+import java.io.File
+import javax.inject.Inject
+import timber.log.Timber
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+import io.androllm.core.voice.wakeword.WakeWordEngine
+
+/**
+ * ViewModel for the settings screen.
+ */
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val settingsRepository: SettingsRepository,
+    private val preferencesDataStore: PreferencesDataStore,
+    private val memoryManager: MemoryManager,
+    private val cloudGateway: io.androllm.core.cloud.CloudGateway,
+    private val attachmentSettingsStore: io.androllm.core.attachments.AttachmentSettingsStore,
+    private val voiceSettingsStore: VoiceSettingsStore,
+    private val voiceController: VoiceAssistantController,
+    private val wakeWordEngine: WakeWordEngine,
+    private val whisperModelManager: WhisperModelManager,
+    private val whisperSpeechRecognizer: WhisperSpeechRecognizer,
+    private val automationSettingsStore: AutomationSettingsStore,
+    private val toolRegistry: ToolRegistry,
+    private val accessibilitySettingsStore: AccessibilitySettingsStore,
+    private val accessibilityController: AccessibilityController,
+    private val mcpSettingsStore: McpSettingsStore,
+    private val mcpConnectionManager: McpConnectionManager,
+    private val modelRepository: ModelRepository,
+    private val engineRepository: EngineRepository
+) : BaseViewModel() {
+
+    private val _uiState = MutableStateFlow<UiState<SettingsData>>(UiState.Loading())
+    val uiState: StateFlow<UiState<SettingsData>> = _uiState
+
+    private val _logPreview = MutableStateFlow("")
+    val logPreview: StateFlow<String> = _logPreview
+
+    private val _memorySettings = MutableStateFlow(MemorySettings())
+    val memorySettings: StateFlow<MemorySettings> = _memorySettings.asStateFlow()
+
+    private val _memoryStats = MutableStateFlow<MemoryInspectorStats?>(null)
+    val memoryStats: StateFlow<MemoryInspectorStats?> = _memoryStats.asStateFlow()
+
+    private val _memoryMessage = MutableStateFlow<String?>(null)
+    val memoryMessage: StateFlow<String?> = _memoryMessage.asStateFlow()
+
+    // ── Chat attachments ──
+
+    private val _attachmentSettings = MutableStateFlow(io.androllm.core.attachments.model.AttachmentSettings())
+    val attachmentSettings: StateFlow<io.androllm.core.attachments.model.AttachmentSettings> = _attachmentSettings.asStateFlow()
+
+    private val _attachmentMessage = MutableStateFlow<String?>(null)
+    val attachmentMessage: StateFlow<String?> = _attachmentMessage.asStateFlow()
+
+    private val _attachmentCacheBytes = MutableStateFlow(0L)
+    val attachmentCacheBytes: StateFlow<Long> = _attachmentCacheBytes.asStateFlow()
+
+    /**
+     * True when the active model supports attachments (cloud mode with a
+     * configured model). Gates the whole Attachment settings card — local
+     * models hide OCR / upload / cache settings entirely.
+     */
+    private val _attachmentsSupported = MutableStateFlow(false)
+    val attachmentsSupported: StateFlow<Boolean> = _attachmentsSupported.asStateFlow()
+
+    private val _storageStats = MutableStateFlow<io.androllm.core.utils.StorageStats?>(null)
+    val storageStats: StateFlow<io.androllm.core.utils.StorageStats?> = _storageStats.asStateFlow()
+
+    /**
+     * Centralized Settings summary state (single source for the header cards).
+     *
+     * - `null` means loading — the UI shows a "…" placeholder, never a stale
+     *   hardcoded value.
+     * - Failures keep the previous value (or "Unknown" in the UI when nothing
+     *   was ever loaded) and never crash the screen.
+     */
+    private val _downloadedModelCount = MutableStateFlow<Int?>(null)
+    val downloadedModelCount: StateFlow<Int?> = _downloadedModelCount.asStateFlow()
+
+    private val _backendLabel = MutableStateFlow<String?>(null)
+    val backendLabel: StateFlow<String?> = _backendLabel.asStateFlow()
+
+    // ── Voice assistant ──
+
+    private val _voiceSettings = MutableStateFlow(VoiceSettings())
+    val voiceSettings: StateFlow<VoiceSettings> = _voiceSettings.asStateFlow()
+
+    // ── Automation / Tool Calling ──
+
+    private val _automationSettings = MutableStateFlow(AutomationSettings())
+    val automationSettings: StateFlow<AutomationSettings> = _automationSettings.asStateFlow()
+
+    /** Registered tools (including future plugins) for the per-tool toggles. */
+    val tools: List<io.androllm.core.tools.api.Tool>
+        get() = toolRegistry.all()
+
+    private fun observeAutomationSettings() {
+        viewModelScope.launch {
+            automationSettingsStore.settings.collect { _automationSettings.value = it }
+        }
+    }
+
+    // ── Chat attachment settings ──
+
+    fun updateAttachmentSettings(transform: (io.androllm.core.attachments.model.AttachmentSettings) -> io.androllm.core.attachments.model.AttachmentSettings) {
+        viewModelScope.launch {
+            attachmentSettingsStore.update(transform)
+            _attachmentMessage.value = null
+        }
+    }
+
+    fun clearAttachmentCache() {
+        viewModelScope.launch {
+            io.androllm.core.attachments.AttachmentCache.clearAll(context)
+            refreshAttachmentCacheBytes()
+            _attachmentMessage.value = "Temporary attachment cache cleared"
+        }
+    }
+
+    fun clearAttachmentMessage() {
+        _attachmentMessage.value = null
+    }
+
+    fun refreshAttachmentCacheBytes() {
+        viewModelScope.launch {
+            _attachmentCacheBytes.value = io.androllm.core.attachments.AttachmentCache.totalBytes(context)
+        }
+    }
+
+    fun updateAutomationSettings(settings: AutomationSettings) {
+        viewModelScope.launch {
+            automationSettingsStore.update { settings }
+        }
+    }
+
+    fun toggleAutomationEnabled() {
+        viewModelScope.launch {
+            automationSettingsStore.setToolCallingEnabled(!_automationSettings.value.toolCallingEnabled)
+        }
+    }
+
+    fun setAutomationConfirmationMode(mode: ConfirmationMode) {
+        viewModelScope.launch {
+            automationSettingsStore.setConfirmationMode(mode)
+        }
+    }
+
+    fun setToolEnabled(name: String, enabled: Boolean) {
+        viewModelScope.launch {
+            automationSettingsStore.setToolEnabled(name, enabled)
+        }
+    }
+
+    // ── MCP Servers ──
+
+    private val _mcpServers = MutableStateFlow<List<McpServer>>(emptyList())
+    val mcpServers: StateFlow<List<McpServer>> = _mcpServers.asStateFlow()
+
+    private val _mcpStates = MutableStateFlow<Map<String, McpConnectionManager.State>>(emptyMap())
+    val mcpStates: StateFlow<Map<String, McpConnectionManager.State>> = _mcpStates.asStateFlow()
+
+    private fun observeMcp() {
+        viewModelScope.launch {
+            mcpSettingsStore.servers.collect { _mcpServers.value = it }
+        }
+        viewModelScope.launch {
+            mcpConnectionManager.states.collect { _mcpStates.value = it }
+        }
+        // Connect every enabled server when the settings screen opens so the
+        // planner sees their tools; a failing server only marks itself failed.
+        viewModelScope.launch {
+            mcpConnectionManager.connectAll()
+        }
+    }
+
+    fun addMcpServer(name: String, url: String, token: String) {
+        viewModelScope.launch {
+            val server = McpServer.fromName(name, url, token)
+            mcpSettingsStore.add(server)
+            if (server.enabled) mcpConnectionManager.connect(server)
+        }
+    }
+
+    fun removeMcpServer(id: String) {
+        viewModelScope.launch {
+            mcpConnectionManager.disconnect(id)
+            mcpSettingsStore.remove(id)
+        }
+    }
+
+    fun setMcpServerEnabled(server: McpServer, enabled: Boolean) {
+        viewModelScope.launch {
+            mcpSettingsStore.setEnabled(server.id, enabled)
+            if (enabled) mcpConnectionManager.connect(server.copy(enabled = true))
+            else mcpConnectionManager.disconnect(server.id)
+        }
+    }
+
+    // ── UI Automation (accessibility engine) ──
+
+    private val _accessibilitySettings = MutableStateFlow(AccessibilitySettings())
+    val accessibilitySettings: StateFlow<AccessibilitySettings> = _accessibilitySettings.asStateFlow()
+
+    /** True when the user enabled the service in system settings (read live). */
+    val accessibilityServiceEnabled: Boolean
+        get() = AccessibilityAutomationService.isServiceEnabled(context)
+
+    /** True while the service is bound to the running engine. */
+    val accessibilityConnected: Boolean
+        get() = accessibilityController.isConnected
+
+    private fun observeAccessibilitySettings() {
+        viewModelScope.launch {
+            accessibilitySettingsStore.settings.collect { _accessibilitySettings.value = it }
+        }
+    }
+
+    fun updateAccessibilitySettings(settings: AccessibilitySettings) {
+        viewModelScope.launch {
+            accessibilitySettingsStore.update { settings }
+        }
+    }
+
+    fun openAccessibilitySettings() {
+        accessibilityController.openSystemSettings()
+    }
+
+    // ── Whisper speech recognition ──
+
+    private val _whisperModels = MutableStateFlow<List<WhisperModel>>(WhisperModels.ALL)
+    val whisperModels: StateFlow<List<WhisperModel>> = _whisperModels.asStateFlow()
+
+    /** ids of fully downloaded models. */
+    private val _whisperInstalled = MutableStateFlow<Set<String>>(emptySet())
+    val whisperInstalled: StateFlow<Set<String>> = _whisperInstalled.asStateFlow()
+
+    /** (modelId, progress 0..1) while downloading. */
+    private val _whisperDownload = MutableStateFlow<Pair<String, Float>?>(null)
+    val whisperDownload: StateFlow<Pair<String, Float>?> = _whisperDownload.asStateFlow()
+
+    /** One-line status message for the section. */
+    private val _whisperMessage = MutableStateFlow<String?>(null)
+    val whisperMessage: StateFlow<String?> = _whisperMessage.asStateFlow()
+
+    /** Active model id (== settings.whisperModel) when loaded. */
+    val whisperActiveModelId: String? get() = _voiceSettings.value.whisperModel
+
+    /** Bytes consumed by downloaded whisper models on disk. */
+    val whisperStorageBytes: Long get() = whisperModelManager.storageInstalledSizeBytes()
+
+    fun refreshWhisperModels() {
+        _whisperInstalled.value = whisperModelManager.installedModels().map { it.id }.toSet()
+    }
+
+    fun whisperIsInstalled(id: String): Boolean = id in _whisperInstalled.value
+
+    fun downloadWhisperModel(id: String) {
+        val model = WhisperModels.byId(id) ?: return
+        if (_whisperDownload.value?.first == id) return
+        viewModelScope.launch {
+            _whisperDownload.value = id to 0f
+            _whisperMessage.value = "Downloading ${model.displayName}…"
+            runCatching {
+                whisperModelManager.download(model) { done, total ->
+                    _whisperDownload.value = id to (if (total > 0) done.toFloat() / total else 0f)
+                }
+            }.onSuccess {
+                refreshWhisperModels()
+                _whisperMessage.value = "${model.displayName} installed."
+            }.onFailure {
+                _whisperMessage.value = "Download failed: ${it.message}"
+            }
+            _whisperDownload.value = null
+        }
+    }
+
+    fun deleteWhisperModel(id: String) {
+        val model = WhisperModels.byId(id) ?: return
+        viewModelScope.launch {
+            whisperModelManager.delete(model)
+            refreshWhisperModels()
+            _whisperMessage.value = "${model.displayName} deleted."
+            if (_voiceSettings.value.whisperModel == id) {
+                updateVoiceSettings(_voiceSettings.value.copy(whisperModel = WhisperModels.recommendedForDevice(deviceRamGb()).id))
+            }
+        }
+    }
+
+    fun selectWhisperModel(id: String) {
+        if (!whisperIsInstalled(id)) return
+        updateVoiceSettings(_voiceSettings.value.copy(whisperModel = id))
+        _whisperMessage.value = "Speech model set to ${WhisperModels.byId(id)?.displayName}."
+    }
+
+    private fun deviceRamGb(): Long =
+        (Runtime.getRuntime().maxMemory() / (1024L * 1024L * 1024L)).coerceAtLeast(1L)
+
+    /** Live helper for a subscriber-free recompute (called from init). */
+    private fun refreshWhisperFromInit() {
+        refreshWhisperModels()
+    }
+
+
+    /** Live assistant phase (drives the settings section status line). */
+    val voiceState: StateFlow<io.androllm.feature.voice.VoiceUiState> = voiceController.state
+
+    val overlayGranted: Boolean get() = OverlayPermission.isGranted(context)
+
+    /** Firebase is optional — the settings header must still work offline as a guest. */
+    private var auth: FirebaseAuth? = runCatching { FirebaseAuth.getInstance() }.getOrNull()
+
+    private val _user = MutableStateFlow(auth?.currentUser?.toSettingsUser())
+    val user: StateFlow<SettingsIdentity?> = _user.asStateFlow()
+
+    private val authListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        _user.value = firebaseAuth.currentUser?.toSettingsUser()
+    }
+
+    /**
+     * Re-reads the Firebase identity. Covers ViewModels created before Firebase
+     * finished initializing (auth was null at init) and screens returning from
+     * the Auth flow — the AuthStateListener normally handles this, but this
+     * makes the header self-healing. Never throws.
+     */
+    fun refreshAuthState() {
+        if (auth == null) {
+            auth = runCatching { FirebaseAuth.getInstance() }.getOrNull()
+            auth?.addAuthStateListener(authListener)
+        }
+        runCatching {
+            _user.value = auth?.currentUser?.toSettingsUser()
+        }.onFailure { e ->
+            Timber.w(e, "[Auth] refreshAuthState failed")
+        }
+    }
+
+    init {
+        observeSettings()
+        // Also observe DataStore theme directly for immediate UI updates
+        viewModelScope.launch {
+            preferencesDataStore.theme.distinctUntilChanged().collect { theme ->
+                _uiState.update { old ->
+                    when (old) {
+                        is UiState.Success -> old.copy(data = old.data.copy(theme = theme))
+                        else -> old
+                    }
+                }
+            }
+        }
+        refreshLogPreview()
+        auth?.addAuthStateListener(authListener)
+        observeMemorySettings()
+        refreshMemoryStats()
+        refreshStorageStats()
+        observeDownloadedModels()
+        observeBackendLabel()
+        observeVoiceSettings()
+        observeAutomationSettings()
+        observeAccessibilitySettings()
+        observeMcp()
+        refreshWhisperFromInit()
+        observeAttachmentSettings()
+        refreshAttachmentCacheBytes()
+    }
+
+    /**
+     * Observes the real downloaded-model list. The count updates immediately
+     * on install/uninstall and survives restarts (Room is the source of
+     * truth). Storage is re-read on every change so the header never goes
+     * stale.
+     */
+    private fun observeDownloadedModels() {
+        viewModelScope.launch {
+            runCatching {
+                modelRepository.observeDownloaded()
+                    .catch { e ->
+                        Timber.w(e, "[Settings] downloaded-models observe failed")
+                    }
+                    .collect { downloaded ->
+                        _downloadedModelCount.value = downloaded.size
+                        refreshStorageStats()
+                    }
+            }.onFailure { e ->
+                Timber.w(e, "[Settings] downloaded-models observe failed")
+            }
+        }
+    }
+
+    /**
+     * Resolves the execution-backend label from real runtime state:
+     *
+     * 1. Active engine backend wins ([EngineState.Ready]/[Generating]).
+     * 2. Else the persisted user preference (NPU/GPU/CPU).
+     * 3. Else AUTO resolves via the startup hardware probe
+     *    ("Auto · GPU" etc.).
+     *
+     * Never throws and never returns a hardcoded stale value — "Unknown" is
+     * the only fallback.
+     */
+    private fun observeBackendLabel() {
+        viewModelScope.launch {
+            runCatching {
+                combine(
+                    preferencesDataStore.backendPreference,
+                    engineRepository.engineState,
+                    engineRepository.backendCapabilities
+                ) { prefStr, engineState, caps ->
+                    Triple(prefStr, engineState, caps)
+                }
+                    .catch { e ->
+                        Timber.w(e, "[Settings] backend observe failed")
+                    }
+                    .collect { (prefStr, engineState, caps) ->
+                        _backendLabel.value = runCatching {
+                            resolveBackendLabel(prefStr, engineState, caps)
+                        }.getOrDefault("Unknown")
+                    }
+            }.onFailure { e ->
+                Timber.w(e, "[Settings] backend observe failed")
+                if (_backendLabel.value == null) _backendLabel.value = "Unknown"
+            }
+        }
+    }
+
+    private fun resolveBackendLabel(
+        prefStr: String,
+        engineState: EngineState,
+        caps: io.androllm.engine.backend.BackendCapabilities
+    ): String {
+        val active: BackendType? = when (engineState) {
+            is EngineState.Ready -> engineState.model.backend
+            is EngineState.Generating -> engineState.model.backend
+            else -> null
+        }
+        if (active != null) return active.toSettingsDisplay()
+        val pref = runCatching { BackendType.valueOf(prefStr) }.getOrDefault(BackendType.AUTO)
+        val normalized = BackendSelector.normalizePreference(pref)
+        if (normalized != BackendType.AUTO) return normalized.toSettingsDisplay()
+        return "Auto · " + BackendSelector.bestAvailable(caps).toSettingsDisplay()
+    }
+
+    private fun BackendType.toSettingsDisplay(): String = when (this) {
+        BackendType.CPU -> "CPU"
+        BackendType.GPU -> "GPU"
+        BackendType.NPU -> "NPU"
+        BackendType.AUTO -> "Auto"
+        BackendType.VULKAN, BackendType.LLAMA_CPP_VULKAN -> "Vulkan"
+        BackendType.QUALCOMM_QNN -> "NPU"
+        BackendType.ONNX_RUNTIME -> "CPU"
+    }
+
+    /**
+     * Signs out of Firebase. The [authListener] fires immediately and clears
+     * [user], so the Settings UI flips to "Sign in with Google" without an
+     * app restart. `_user` is also cleared synchronously for instant feedback.
+     * Offline-safe: never throws.
+     */
+    fun signOut() {
+        viewModelScope.launch {
+            Timber.i("[Auth] Logout — Firebase signOut requested")
+            runCatching { auth?.signOut() }
+                .onFailure { e -> Timber.w(e, "[Auth] signOut failed") }
+            _user.value = null
+        }
+    }
+
+    /**
+     * Re-reads the header summary (storage + whisper state). Model count and
+     * backend update automatically via their flows; this covers storage that
+     * changed outside the model table (cache clears, whisper installs).
+     */
+    fun refreshSettingsSummary() {
+        refreshStorageStats()
+        refreshWhisperModels()
+        refreshAttachmentCacheBytes()
+    }
+
+    // ── Voice assistant ──
+
+    private fun observeVoiceSettings() {
+        viewModelScope.launch {
+            voiceSettingsStore.settings.collect { _voiceSettings.value = it }
+        }
+    }
+
+    fun updateVoiceSettings(settings: VoiceSettings) {
+        viewModelScope.launch {
+            voiceSettingsStore.update { settings }
+        }
+    }
+
+    fun startVoiceAssistant() {
+        viewModelScope.launch {
+            // Persist the master switch BEFORE the service reads it, then start.
+            if (!_voiceSettings.value.enabled) {
+                voiceSettingsStore.update { it.copy(enabled = true) }
+            }
+            VoiceAssistant.start(context)
+        }
+    }
+
+    fun stopVoiceAssistant() {
+        viewModelScope.launch {
+            voiceSettingsStore.update { it.copy(enabled = false) }
+            VoiceAssistant.stop(context)
+        }
+    }
+
+    fun openOverlayPermissionSettings() {
+        OverlayPermission.openSettings(context)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        auth?.removeAuthStateListener(authListener)
+    }
+
+    private fun observeSettings() {
+        settingsRepository.observeSettings()
+            .combine(preferencesDataStore.userPreferences) { settings, prefs ->
+                SettingsData(
+                    theme = settings.theme,
+                    language = settings.language,
+                    storagePath = settings.storagePath,
+                    developerMode = settings.developerMode,
+                    versionName = context.getVersionNameSafe(),
+                    markdownEnabled = settings.markdownEnabled,
+                    codeWrapping = settings.codeWrapping,
+                    autoScroll = settings.autoScroll,
+                    typingIndicator = settings.typingIndicator,
+                    dynamicColor = prefs.dynamicColor,
+                    blurIntensity = prefs.blurIntensity,
+                    uiDensity = prefs.uiDensity,
+                    fontSize = prefs.fontSize,
+                    chatWallpaper = prefs.chatWallpaper,
+                    reduceMotion = prefs.reduceMotion,
+                    accentHex = prefs.accentColor,
+                    warnBeforeOpeningAiLinks = settings.warnBeforeOpeningAiLinks
+                )
+            }
+            .onEach { _uiState.value = UiState.Success(it) }
+            .launchIn(viewModelScope)
+    }
+
+    /**
+     * Cycles the theme between system, light, dark and AMOLED.
+     */
+    fun cycleTheme() {
+        viewModelScope.launch {
+            // Read current theme directly from DataStore to avoid stale UI state
+            val current = preferencesDataStore.theme.first()
+            val next = when (current) {
+                ThemeMode.SYSTEM -> ThemeMode.LIGHT
+                ThemeMode.LIGHT -> ThemeMode.DARK
+                ThemeMode.DARK -> ThemeMode.AMOLED
+                ThemeMode.AMOLED -> ThemeMode.SYSTEM
+            }
+            settingsRepository.updateTheme(next).onSuccess { _ ->
+                preferencesDataStore.setTheme(next)
+            }
+        }
+    }
+
+    /**
+     * Toggles developer mode.
+     */
+    fun toggleDeveloperMode() {
+        viewModelScope.launch {
+            val current = (_uiState.value as? UiState.Success)?.data?.developerMode ?: false
+            settingsRepository.updateDeveloperMode(!current)
+        }
+    }
+
+    /**
+     * Clears the app cache.
+     */
+    fun clearCache() {
+        viewModelScope.launch {
+            StorageUtils.clearCache(context)
+            refreshStorageStats()
+        }
+    }
+
+    /**
+     * Re-reads the real free space on the models filesystem (cheap: a single
+     * filesystem stat, no directory walk). Never throws — a storage read must
+     * not take down the settings screen (or leak an uncaught coroutine
+     * exception in tests when the mock context returns unusable File mocks).
+     * Runs entirely on IO: the coroutine must not need the Main dispatcher to
+     * resume after a test teardown (StateFlow writes are thread-safe).
+     */
+    fun refreshStorageStats() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val stats = runCatching { StorageUtils.getStorageStats(context) }.getOrNull()
+            if (stats != null) {
+                _storageStats.value = stats
+            }
+        }
+    }
+
+    fun exportLogs() {
+        viewModelScope.launch {
+            val logFile = LogUtils.getLogFile(context)
+            if (logFile.exists()) {
+                ShareUtils.shareFile(context, logFile, "AndroLLM Logs")
+            }
+        }
+    }
+
+    fun refreshLogPreview() {
+        _logPreview.value = LogUtils.readRecentLogs(context)
+    }
+
+    // â”€â”€ On-device memory system â”€â”€
+
+    private fun observeMemorySettings() {
+        viewModelScope.launch {
+            memoryManager.settings.collect { _memorySettings.value = it }
+        }
+    }
+
+    private fun observeAttachmentSettings() {
+        viewModelScope.launch {
+            attachmentSettingsStore.settings.collect { _attachmentSettings.value = it }
+        }
+        // Capability gate for the Attachment settings card: only visible when
+        // the selected provider supports attachments (cloud, capability-driven
+        // — never a provider-name check).
+        viewModelScope.launch {
+            cloudGateway.settings.collect { settings ->
+                _attachmentsSupported.value = settings.enabled &&
+                    io.androllm.core.attachments.ProviderCapabilities.supportsAttachments(settings.defaultModelId)
+            }
+        }
+    }
+
+    fun refreshMemoryStats() {
+        viewModelScope.launch {
+            _memoryStats.value = memoryManager.getInspectorStats()
+        }
+    }
+
+    fun toggleMemoryEnabled() {
+        viewModelScope.launch {
+            val enabled = !_memorySettings.value.enabled
+            memoryManager.updateSettings { it.copy(enabled = enabled) }
+            if (enabled) {
+                memoryManager.preloadEmbeddingModel()
+                _memoryMessage.value = "Memory enabled"
+            } else {
+                _memoryMessage.value = "Memory disabled"
+            }
+            refreshMemoryStats()
+        }
+    }
+
+    fun updateSimilarityThreshold(value: Float) {
+        viewModelScope.launch {
+            memoryManager.updateSettings { it.copy(similarityThreshold = value) }
+        }
+    }
+
+    fun updateRetrievalCount(value: Int) {
+        viewModelScope.launch {
+            memoryManager.updateSettings { it.copy(retrievalCount = value) }
+        }
+    }
+
+    fun updateSummarizationInterval(value: Int) {
+        viewModelScope.launch {
+            memoryManager.updateSettings { it.copy(summarizationInterval = value) }
+        }
+    }
+
+    fun setEmbeddingModelPath(path: String) {
+        viewModelScope.launch {
+            memoryManager.setEmbeddingModelPath(path.trim())
+            _memoryMessage.value = "Embedding model path saved"
+            refreshMemoryStats()
+        }
+    }
+
+    /**
+     * Points embeddings at the active cloud provider's embedding model
+     * (OpenAI-compatible id, e.g. "openai/text-embedding-3-small"). Empty
+     * clears the cloud route and reverts to the local LiteRT model.
+     */
+    fun setCloudEmbeddingModel(modelId: String) {
+        viewModelScope.launch {
+            memoryManager.setCloudEmbeddingModel(modelId.trim())
+            _memoryMessage.value = if (modelId.isBlank()) {
+                "Cloud embedding disabled — using local model"
+            } else {
+                "Cloud embedding model saved: $modelId"
+            }
+            refreshMemoryStats()
+        }
+    }
+
+    fun testEmbeddingModel() {
+        viewModelScope.launch {
+            memoryManager.preloadEmbeddingModel()
+                .onSuccess { _memoryMessage.value = "Embedding model loaded (dim ${memoryManager.getInspectorStats().embeddingDimension})" }
+                .onError { _memoryMessage.value = "Model load failed: ${it.message}" }
+            refreshMemoryStats()
+        }
+    }
+
+    fun deleteAllMemories() {
+        viewModelScope.launch {
+            memoryManager.deleteAll()
+            _memoryMessage.value = "All memories deleted"
+            refreshMemoryStats()
+        }
+    }
+
+    fun exportMemories() {
+        viewModelScope.launch {
+            memoryManager.exportMemories()
+                .onSuccess { file ->
+                    ShareUtils.shareFile(context, file, "AndroLLM Memory Export")
+                    _memoryMessage.value = "Export shared"
+                }
+                .onError { _memoryMessage.value = "Export failed: ${it.message}" }
+        }
+    }
+
+    /**
+     * Imports memories from a user-picked JSON file (SAF Uri).
+     */
+    fun importMemories(uri: Uri?) {
+        if (uri == null) return
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                val temp = File(context.cacheDir, "memory_import_${System.currentTimeMillis()}.json")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    temp.outputStream().use { input.copyTo(it) }
+                }
+                memoryManager.importMemories(temp)
+            }
+            result.onSuccess {
+                _memoryMessage.value = "Imported +${it.inserted} ~${it.updated} -${it.skipped}"
+            }.onError {
+                _memoryMessage.value = "Import failed: ${it.message}"
+            }
+            refreshMemoryStats()
+        }
+    }
+
+    fun clearMemoryMessage() {
+        _memoryMessage.value = null
+    }
+
+    fun toggleMarkdownEnabled() {
+        viewModelScope.launch {
+            val current = (_uiState.value as? UiState.Success)?.data?.markdownEnabled ?: true
+            settingsRepository.updateSettings { it.copy(markdownEnabled = !current) }
+        }
+    }
+
+    fun toggleCodeWrapping() {
+        viewModelScope.launch {
+            val current = (_uiState.value as? UiState.Success)?.data?.codeWrapping ?: false
+            settingsRepository.updateSettings { it.copy(codeWrapping = !current) }
+        }
+    }
+
+    fun toggleAutoScroll() {
+        viewModelScope.launch {
+            val current = (_uiState.value as? UiState.Success)?.data?.autoScroll ?: true
+            settingsRepository.updateSettings { it.copy(autoScroll = !current) }
+        }
+    }
+
+    fun toggleTypingIndicator() {
+        viewModelScope.launch {
+            val current = (_uiState.value as? UiState.Success)?.data?.typingIndicator ?: true
+            settingsRepository.updateSettings { it.copy(typingIndicator = !current) }
+        }
+    }
+
+    fun toggleWarnBeforeOpeningAiLinks() {
+        viewModelScope.launch {
+            val current = (_uiState.value as? UiState.Success)?.data?.warnBeforeOpeningAiLinks ?: true
+            settingsRepository.updateSettings { it.copy(warnBeforeOpeningAiLinks = !current) }
+        }
+    }
+
+    fun setWarnBeforeOpeningAiLinks(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.updateSettings { it.copy(warnBeforeOpeningAiLinks = enabled) }
+        }
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        viewModelScope.launch { preferencesDataStore.setDynamicColor(enabled) }
+    }
+
+    fun setBlurIntensity(intensity: Float) {
+        viewModelScope.launch { preferencesDataStore.setBlurIntensity(intensity) }
+    }
+
+    fun cycleUiDensity() {
+        viewModelScope.launch {
+            val current = (_uiState.value as? UiState.Success)?.data?.uiDensity ?: UiDensity.DEFAULT
+            val next = when (current) {
+                UiDensity.COMPACT -> UiDensity.DEFAULT
+                UiDensity.DEFAULT -> UiDensity.COMFORTABLE
+                UiDensity.COMFORTABLE -> UiDensity.COMPACT
+            }
+            preferencesDataStore.setUiDensity(next)
+        }
+    }
+
+    fun cycleFontSize() {
+        viewModelScope.launch {
+            val current = (_uiState.value as? UiState.Success)?.data?.fontSize ?: ChatFontSize.MEDIUM
+            val next = when (current) {
+                ChatFontSize.SMALL -> ChatFontSize.MEDIUM
+                ChatFontSize.MEDIUM -> ChatFontSize.LARGE
+                ChatFontSize.LARGE -> ChatFontSize.SMALL
+            }
+            preferencesDataStore.setFontSize(next)
+        }
+    }
+
+    fun setChatWallpaper(hex: String) {
+        viewModelScope.launch { preferencesDataStore.setChatWallpaper(hex) }
+    }
+
+    fun setReduceMotion(enabled: Boolean) {
+        viewModelScope.launch { preferencesDataStore.setReduceMotion(enabled) }
+    }
+
+    fun setAccentColor(argbHex: String) {
+        viewModelScope.launch { preferencesDataStore.setAccentColor(argbHex) }
+    }
+
+    fun testWakeEngine() {
+        viewModelScope.launch {
+            Timber.i("TEST WAKE ENGINE: Initializing Wake Word Model...")
+            val ready = wakeWordEngine.ensureInitialized()
+            Timber.i("TEST WAKE ENGINE: Model initialized=$ready")
+            if (ready) {
+                wakeWordEngine.startSession(listOf("hey andro"))
+                val syntheticChunk = FloatArray(3200) { 1000.0f * kotlin.math.sin(it.toDouble() * 0.1).toFloat() }
+                for (i in 1..20) {
+                    val res = wakeWordEngine.feed(syntheticChunk)
+                    Timber.i("TEST WAKE ENGINE: Chunk #$i feed result='$res'")
+                }
+                Timber.i("TEST WAKE ENGINE: Completed synthetic test feed pass.")
+            }
+        }
+    }
+
+    /**
+     * Reads the version name without throwing.
+     */
+    private fun Context.getVersionNameSafe(): String = runCatching {
+        packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0"
+    }.getOrDefault("1.0")
+}
+
+/**
+ * Data displayed on the settings screen.
+ */
+data class SettingsData(
+    val theme: ThemeMode = ThemeMode.SYSTEM,
+    val language: String = "en",
+    val storagePath: String = "",
+    val developerMode: Boolean = false,
+    val versionName: String = "1.0",
+    val markdownEnabled: Boolean = true,
+    val codeWrapping: Boolean = false,
+    val autoScroll: Boolean = true,
+    val typingIndicator: Boolean = true,
+    val dynamicColor: Boolean = true,
+    val blurIntensity: Float = 0.5f,
+    val uiDensity: UiDensity = UiDensity.DEFAULT,
+    val fontSize: ChatFontSize = ChatFontSize.MEDIUM,
+    val chatWallpaper: String = "",
+    val reduceMotion: Boolean = false,
+    val accentHex: String = "",
+    val warnBeforeOpeningAiLinks: Boolean = true
+)
+
+/**
+ * UI snapshot of the Firebase identity for the settings header (null-safe).
+ *
+ * `null` user = guest/signed-out. A non-null identity always means signed-in
+ * (keyed off the Firebase UID, never the email — GitHub/private emails can be
+ * null even when fully authenticated).
+ */
+data class SettingsIdentity(
+    val uid: String,
+    val displayName: String?,
+    val email: String?,
+    val providerId: String = ""
+) {
+    val isGuest: Boolean get() = uid.isBlank()
+    /** Friendly account-type label, e.g. "Google account". Never the display name. */
+    val providerLabel: String
+        get() = when {
+            providerId.contains("google", ignoreCase = true) -> "Google account"
+            providerId.contains("github", ignoreCase = true) -> "GitHub account"
+            providerId.contains("password", ignoreCase = true) -> "Email account"
+            providerId.contains("phone", ignoreCase = true) -> "Phone account"
+            email?.isNotBlank() == true -> "Synced account"
+            else -> "AndroLLM device account"
+        }
+}
+
+private fun FirebaseUser.toSettingsUser(): SettingsIdentity = SettingsIdentity(
+    uid = uid,
+    displayName = displayName,
+    email = email,
+    providerId = providerData.firstOrNull { it.providerId.isNotBlank() && it.providerId != "firebase" }?.providerId.orEmpty()
+)
