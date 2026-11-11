@@ -51,6 +51,7 @@ class MainActivity : Activity() {
     private lateinit var appSettings: AppSettings
     private lateinit var content: ContentStore
     private lateinit var packFiles: PackStorage
+    private lateinit var modelFiles: ModelStorage
     private var tts: TextToSpeech? = null
 
     private val handler = Handler(Looper.getMainLooper())
@@ -80,6 +81,7 @@ class MainActivity : Activity() {
 
         content = ContentStore()
         packFiles = PackStorage(File(filesDir, "packs"))
+        modelFiles = ModelStorage(File(filesDir, "models"))
         packFiles.loadAll().forEach { content.importZip(it) }
 
         val soul = SoulState()
@@ -121,8 +123,8 @@ class MainActivity : Activity() {
         }
 
         val settingsButton = Button(this).apply {
-            text = "Dozvole"
-            setOnClickListener { showPermissions() }
+            text = "Postavke"
+            setOnClickListener { showSettings() }
         }
         val packsButton = Button(this).apply {
             text = "Uvezi paket"
@@ -204,6 +206,84 @@ class MainActivity : Activity() {
             .show()
     }
 
+    /** Postavke: dozvole, način rada modela i lokalni modeli. */
+    private fun showSettings() {
+        val items = arrayOf("Dozvole", "Način rada modela", "Lokalni modeli")
+        AlertDialog.Builder(this)
+            .setTitle("Postavke")
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> showPermissions()
+                    1 -> showModelMode()
+                    2 -> showLocalModels()
+                }
+            }
+            .setNegativeButton("Zatvori", null)
+            .show()
+    }
+
+    /** Lokalno ili oblak. Oblak još nije aktivan (nema API ključa), pa se radi lokalno. */
+    private fun showModelMode() {
+        val modes = arrayOf("LOCAL", "CLOUD")
+        val labels = arrayOf("Lokalno", "Oblak (još nije aktivan, nema API ključa)")
+        val current = if (appSettings.modelMode() == "CLOUD") 1 else 0
+        AlertDialog.Builder(this)
+            .setTitle("Način rada modela")
+            .setSingleChoiceItems(labels, current) { dialog, which ->
+                appSettings.setModelMode(modes[which])
+                toast(if (modes[which] == "CLOUD") "Oblak nije aktivan, radi se lokalno" else "Radi se lokalno")
+                dialog.dismiss()
+            }
+            .setNegativeButton("Zatvori", null)
+            .show()
+    }
+
+    /** Lokalni modeli: uvoz fajla i brisanje. Pokretanje modela još nije podržano. */
+    private fun showLocalModels() {
+        val files = modelFiles.list()
+        val builder = AlertDialog.Builder(this).setTitle("Lokalni modeli")
+        if (files.isNotEmpty()) {
+            val names = files.map { "${it.name} (${it.length() / (1024 * 1024)} MB)" }.toTypedArray()
+            builder.setItems(names) { _, which -> confirmDeleteModel(files[which]) }
+        } else {
+            builder.setMessage("Nema uvezenih modela.")
+        }
+        builder.setPositiveButton("Uvezi model") { _, _ -> pickModel() }
+            .setNegativeButton("Zatvori", null)
+            .show()
+    }
+
+    private fun confirmDeleteModel(file: File) {
+        AlertDialog.Builder(this)
+            .setTitle("Obrisati model?")
+            .setMessage("Briše se samo fajl ${file.name}. Memorija i razgovori ostaju.")
+            .setPositiveButton("Obriši") { _, _ ->
+                modelFiles.delete(file)
+                toast("Model obrisan")
+            }
+            .setNegativeButton("Odustani", null)
+            .show()
+    }
+
+    private fun pickModel() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+        startActivityForResult(intent, REQUEST_MODEL)
+    }
+
+    /** Fajl modela se kopira u streamu, jer modeli znaju biti veliki. */
+    private fun importModel(uri: android.net.Uri) {
+        val name = uri.lastPathSegment?.substringAfterLast('/') ?: "model.bin"
+        try {
+            val opened = contentResolver.openInputStream(uri)?.use { modelFiles.importStream(name, it) }
+            if (opened == null) toast("Model se ne može otvoriti")
+            else toast("Model uvezen: $name. Pokretanje modela još nije podržano.")
+        } catch (e: Exception) {
+            toast("Uvoz nije uspio: ${e.message}")
+        }
+    }
+
     private fun pickPack() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
             .addCategory(Intent.CATEGORY_OPENABLE)
@@ -243,6 +323,7 @@ class MainActivity : Activity() {
                 if (heard != null) sendText(heard)
             }
             REQUEST_PACK -> data?.data?.let { importPack(it) }
+            REQUEST_MODEL -> data?.data?.let { importModel(it) }
         }
     }
 
@@ -268,5 +349,6 @@ class MainActivity : Activity() {
         private const val TICK_MS = 30_000L
         private const val REQUEST_SPEECH = 1
         private const val REQUEST_PACK = 2
+        private const val REQUEST_MODEL = 3
     }
 }
