@@ -131,7 +131,7 @@ fun VoiceAssistantSection(
                         text = when {
                             liveState.active -> statusLabel(liveState.phase)
                             settings.enabled -> "Starting\u2026"
-                            else -> "Always-on wake word \u2014 say \u201CHey Andro\u201D"
+                            else -> "Always-on wake word \u2014 say \u201CAlexa\u201D"
                         },
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = if (liveState.active) MaterialTheme.ledger.lampDeep else MaterialTheme.ledger.deskInk
@@ -181,7 +181,7 @@ fun VoiceAssistantSection(
                 ToggleRow(
                     icon = Icons.Filled.RecordVoiceOver,
                     title = "Enable Wake Word",
-                    subtitle = "Listen continuously for \"Hey Andro\"",
+                    subtitle = "Listen continuously for \"Alexa\"",
                     checked = settings.enableWakeWord,
                     onCheckedChange = { onUpdate(settings.copy(enableWakeWord = it)) }
                 )
@@ -327,7 +327,7 @@ fun VoiceAssistantSection(
                 ToggleRow(
                     icon = Icons.Filled.Mic,
                     title = "Auto-open overlay",
-                    subtitle = "Show the floating assistant when \"Hey Andro\" fires",
+                    subtitle = "Show the floating assistant when \"Alexa\" fires",
                     checked = settings.autoOpenOverlay,
                     onCheckedChange = { onUpdate(settings.copy(autoOpenOverlay = it)) }
                 )
@@ -514,7 +514,7 @@ fun VoiceAssistantSection(
 @Composable
 private fun statusLabel(phase: VoicePhase): String = when (phase) {
     VoicePhase.IDLE -> "Ready"
-    VoicePhase.WAKE, VoicePhase.LISTENING -> "Listening for \u201CHey Andro\u201D\u2026"
+    VoicePhase.WAKE, VoicePhase.LISTENING -> "Listening for \u201CAlexa\u201D\u2026"
     VoicePhase.LISTEN, VoicePhase.RECEIVING_AUDIO -> "Listening to speech\u2026"
     VoicePhase.RUNNING_INFERENCE -> "Processing wake word\u2026"
     VoicePhase.WAKE_DETECTED -> "Wake word detected!"

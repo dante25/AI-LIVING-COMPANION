@@ -127,11 +127,10 @@ class SherpaOnnxWakeWordEngine @Inject constructor(
                 "feed: samples=${samples.size} decodes=$decodes kw='$rawKw' tokens=[$tokensStr]"
             )
             val hasTokens = tokensList.isNotEmpty()
-            val matchesTokenPhonemes = tokensList.any { t ->
-                t.contains("HH") || t.contains("EY") || t.contains("AE") || t.contains("OW") || t.contains("ANDR")
-            }
+            // Rezerva kad model ne postavi ključnu riječ: slijed glasova "L EH K S" (Alexa)
+            val matchesTokenPhonemes = Regex("\\bL EH\\d K S\\b").containsMatchIn(tokensStr)
             val detected = rawKw.isNotBlank() || (hasTokens && matchesTokenPhonemes)
-            val keyword = if (detected) rawKw.ifBlank { "HEY ANDRO" } else null
+            val keyword = if (detected) rawKw.ifBlank { "ALEXA" } else null
             if (keyword != null) {
                 Timber.tag("KWS").i("DETECTED: $keyword (rawKw='$rawKw', tokens=[$tokensStr])")
                 s.reset(st)

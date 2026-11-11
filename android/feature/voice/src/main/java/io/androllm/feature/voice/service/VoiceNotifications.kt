@@ -33,7 +33,7 @@ object VoiceNotifications {
 
     fun build(
         context: Context,
-        text: String = "Listening for \u201CHey Andro\u201D",
+        text: String = "Listening for \u201CAlexa\u201D",
         showDisableAction: Boolean = true
     ): Notification {
         val disableIntent = PendingIntent.getService(

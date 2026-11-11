@@ -6,10 +6,10 @@ package io.androllm.core.voice.model
 data class VoiceSettings(
     /** Master switch for the Voice Assistant. */
     val enabled: Boolean = false,
-    /** Enable wake word engine ("Hey Andro"). */
+    /** Enable wake word engine ("Alexa"). */
     val enableWakeWord: Boolean = true,
     /** Custom wake phrases (lowercase). "hey andro", "okay andro", "andro" are the defaults. */
-    val wakePhrases: List<String> = listOf("hey andro", "okay andro", "andro"),
+    val wakePhrases: List<String> = listOf("alexa", "hey alexa"),
     /** Keyword-spotter sensitivity (0..1). Higher = more responsive, more false positives. */
     val sensitivity: Float = 0.5f,
     /** Battery saver: reduces CPU (single thread, no continuous conversation). */

@@ -69,7 +69,7 @@ import timber.log.Timber
  * Owns the full voice loop — wake word → streaming STT → (local or cloud)
  * inference → sentence-level TTS — including barge-in interruption. Runs as a
  * microphone foreground service so Android keeps it alive and the notification
- * shows "Listening for 'Hey Andro'" with a tap-to-disable action.
+ * shows "Listening for 'Alexa'" with a tap-to-disable action.
  *
  * Nothing here touches the UI thread: audio capture, sherpa inference and
  * network I/O all run inside [scope] (Default dispatcher).
@@ -233,7 +233,7 @@ class VoiceAssistantService : Service() {
                         state.phase == VoicePhase.THINK -> "Thinking\u2026"
                         state.phase == VoicePhase.GENERATING -> "Responding\u2026"
                         state.phase == VoicePhase.SPEAK -> "Speaking\u2026"
-                        else -> "Listening for \u201CHey Andro\u201D"
+                        else -> "Listening for \u201CAlexa\u201D"
                     }
                     // The live mic metrics (RMS/amplitude) update on EVERY
                     // audio frame, which re-fires this collector constantly.

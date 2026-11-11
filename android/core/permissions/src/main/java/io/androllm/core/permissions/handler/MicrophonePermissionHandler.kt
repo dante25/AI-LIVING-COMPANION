@@ -21,7 +21,7 @@ class MicrophonePermissionHandler @Inject constructor() : PermissionHandler {
     override val id = "voice_assistant"
     override val title = "Voice Assistant"
     override val description = "Talk to AndroLLM hands-free and use voice features."
-    override val explanation = "The microphone powers the “Hey Andro” wake word, spoken " +
+    override val explanation = "The microphone powers the “Alexa” wake word, spoken " +
         "questions and voice replies. Audio is processed on your device and never uploaded."
     override val isRequired = false
     override val isOptional = true
