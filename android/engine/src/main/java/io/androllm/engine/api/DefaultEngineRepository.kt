@@ -358,12 +358,19 @@ class DefaultEngineRepository @Inject constructor(
      */
     private suspend fun probeCoherence(): CoherenceResult {
         var probeStalled = false
+        var probeError: String? = null
         val probeText = try {
             withTimeout(SELF_TEST_TIMEOUT_MS) {
-                engine.generate(
+                val generated = engine.generate(
                     "Hi",
                     GenerationConfig(temperature = 0f, maxTokens = 12, seed = -1, debugTokenLogging = true)
-                ).getOrNull()
+                )
+                // Pravi razlog neuspjeha ide u poruku (prije je bio samo "no output")
+                if (generated is io.androllm.core.common.Result.Error) {
+                    probeError = "${generated.exception.javaClass.simpleName}: ${generated.exception.message}"
+                    android.util.Log.e(TAG, "Self-test probe returned an engine error: $probeError", generated.exception)
+                }
+                generated.getOrNull()
             }
         } catch (e: TimeoutCancellationException) {
             probeStalled = true
@@ -380,6 +387,9 @@ class DefaultEngineRepository @Inject constructor(
             )
         }
         val coherence = CoherenceChecker.check(probeText)
+        if (coherence is CoherenceResult.Fail && probeError != null) {
+            return CoherenceResult.Fail("${coherence.reason} (greška motora: $probeError)")
+        }
         if (coherence !is CoherenceResult.Pass) return coherence
         // Template/tokenizer mismatch guard: a model that decodes control
         // tokens (im_start / think / bos / ...) instead of assistant text is a
