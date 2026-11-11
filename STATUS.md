@@ -17,11 +17,13 @@ Zadnje ažuriranje: 2026-11-10. Grana: `claude/eager-archimedes-366atg`.
 | 9 Akcije | Aplikacije, pretraga i slanje prolaze kroz dozvole i potvrdu; neuspjeh se prijavljuje kao neuspjeh | `core/.../actions/` | dio od 95 |
 | 10 Autonomno ponašanje (pravila) | Spava, sjeda, zaleti se na ekran ili miruje, prema stanju duše; namjere samo iz dozvoljene liste | `core/.../behavior/` | dio od 95 |
 
-Ukupno: Python 15 testova, Kotlin 95 testova (provjereno kompajlerom kotlinc 2.1.0 i JUnit konzolom).
+Ukupno: Python 15 testova, Kotlin 100 testova (provjereno kompajlerom kotlinc 2.1.0 i JUnit konzolom).
 
 Dokumenti: `PLAN_v2.md` (plan i odluke), `Mini_Alexa_*` (originalni planovi), `README.md`.
 
 ## Android aplikacija (prva verzija)
+
+APK: `build/apk/mini-alexa-debug.apk` (poslan kao fajl, nije u repou).
 
 - `app/`: ekran chata, unos tekstom i glasom (Android prepoznavanje govora), odgovor se čita naglas (Android TTS).
 - Model je `EchoModel` (placeholder, samo potvrđuje poruku). Pravi lokalni model je faza 7.
@@ -34,7 +36,6 @@ Dokumenti: `PLAN_v2.md` (plan i odluke), `Mini_Alexa_*` (originalni planovi), `R
 **Blokirano okruženjem:**
 - Android: SDK je instaliran nakon što je `dl.google.com` dodan u dozvoljene domene. APK se gradi skriptom `scripts/build_apk.sh`. Nije testiran na telefonu ni emulatoru.
 - Gradle: `downloads.gradle.org` je blokiran, pa se APK gradi bez Gradle-a. Gradle build nije podešen.
-- Gradle build: nije provjeren. Kotlin testovi su pokretani direktno kompajlerom.
 
 **Čeka tvoj unos:**
 - 3D model: nije pronađen. Treba fajl (`.vrm`, `.glb`, `.fbx`).
