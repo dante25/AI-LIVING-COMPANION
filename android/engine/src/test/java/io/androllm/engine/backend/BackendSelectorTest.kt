@@ -32,28 +32,28 @@ class BackendSelectorTest {
     // ── AUTO priority: NPU → GPU → CPU ──────────────────────────────────────
 
     @Test
-    fun `AUTO with usable NPU and NPU-capable model tries NPU GPU CPU`() {
+    fun `AUTO with usable NPU and NPU-capable model is CPU only`() {
         val candidates = BackendSelector.orderedCandidates(BackendType.AUTO, caps(npuUsable = true), npuModel)
-        assertEquals(listOf(BackendType.NPU, BackendType.GPU, BackendType.CPU), types(candidates))
+        assertEquals(listOf(BackendType.CPU), types(candidates))
     }
 
     @Test
-    fun `AUTO with usable NPU but NPU-incapable model skips straight to GPU`() {
+    fun `AUTO with usable NPU but NPU-incapable model is CPU only`() {
         val candidates = BackendSelector.orderedCandidates(BackendType.AUTO, caps(npuUsable = true), model)
-        assertEquals(listOf(BackendType.GPU, BackendType.CPU), types(candidates))
+        assertEquals(listOf(BackendType.CPU), types(candidates))
     }
 
     @Test
-    fun `AUTO without NPU tries GPU CPU`() {
+    fun `AUTO without NPU is CPU only`() {
         val candidates = BackendSelector.orderedCandidates(BackendType.AUTO, caps(npuUsable = false), model)
-        assertEquals(listOf(BackendType.GPU, BackendType.CPU), types(candidates))
+        assertEquals(listOf(BackendType.CPU), types(candidates))
     }
 
     @Test
-    fun `AUTO skips NPU when the model does not support it`() {
+    fun `AUTO is CPU only even when the model does not support NPU`() {
         val modelNoNpu = model.copy(supportsNpu = false)
         val candidates = BackendSelector.orderedCandidates(BackendType.AUTO, caps(npuUsable = true), modelNoNpu)
-        assertEquals(listOf(BackendType.GPU, BackendType.CPU), types(candidates))
+        assertEquals(listOf(BackendType.CPU), types(candidates))
     }
 
     @Test
@@ -99,27 +99,27 @@ class BackendSelectorTest {
     // ── resolveAuto / bestAvailable / normalizePreference ───────────────────
 
     @Test
-    fun `resolveAuto prefers NPU when usable and model supports it`() {
-        assertEquals(BackendType.NPU, BackendSelector.resolveAuto(caps(npuUsable = true), npuModel))
+    fun `resolveAuto is always CPU even when NPU is usable and supported`() {
+        assertEquals(BackendType.CPU, BackendSelector.resolveAuto(caps(npuUsable = true), npuModel))
     }
 
     @Test
-    fun `resolveAuto prefers GPU when NPU unusable`() {
-        assertEquals(BackendType.GPU, BackendSelector.resolveAuto(caps(), model))
+    fun `resolveAuto is CPU when NPU is unusable`() {
+        assertEquals(BackendType.CPU, BackendSelector.resolveAuto(caps(), model))
     }
 
     @Test
     fun `resolveAuto respects model support flags`() {
         val modelNoNpu = model.copy(supportsNpu = false)
-        assertEquals(BackendType.GPU, BackendSelector.resolveAuto(caps(npuUsable = true), modelNoNpu))
+        assertEquals(BackendType.CPU, BackendSelector.resolveAuto(caps(npuUsable = true), modelNoNpu))
         val modelCpuOnly = model.copy(supportsNpu = false, supportsGpu = false)
         assertEquals(BackendType.CPU, BackendSelector.resolveAuto(caps(npuUsable = true), modelCpuOnly))
     }
 
     @Test
-    fun `bestAvailable prefers NPU then GPU`() {
-        assertEquals(BackendType.NPU, BackendSelector.bestAvailable(caps(npuUsable = true)))
-        assertEquals(BackendType.GPU, BackendSelector.bestAvailable(caps()))
+    fun `bestAvailable is always the stable CPU`() {
+        assertEquals(BackendType.CPU, BackendSelector.bestAvailable(caps(npuUsable = true)))
+        assertEquals(BackendType.CPU, BackendSelector.bestAvailable(caps()))
         assertEquals(BackendType.CPU, BackendSelector.bestAvailable(BackendCapabilities(gpuAvailable = false)))
     }
 
