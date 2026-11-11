@@ -141,9 +141,9 @@ fun MessageBubble(
                     ) {
                         Text(
                             text = when {
-                                isUser -> "YOU"
-                                isSystem -> "NOTE"
-                                else -> "AI"
+                                isUser -> "TI"
+                                isSystem -> "NAPOMENA"
+                                else -> "ALEXA"
                             },
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.SemiBold,

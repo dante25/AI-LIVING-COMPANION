@@ -205,7 +205,7 @@ fun ComposeInputArea(
                     },
                     placeholder = {
                         Text(
-                            text = "Send a message…",
+                            text = "Napiši poruku…",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.ledger.deskInk
                             )

@@ -819,10 +819,10 @@ fun ChatScreen(
 private fun SmartReplyChips(onSend: (String) -> Unit) {
     val suggestions = remember {
         listOf(
-            "Explain this in more detail",
-            "Give me a concrete example",
-            "Summarise the key points",
-            "What are the trade-offs?"
+            "Objasni to detaljnije",
+            "Daj mi konkretan primjer",
+            "Sažmi najvažnije",
+            "Koje su prednosti i mane?"
         )
     }
 
@@ -833,7 +833,7 @@ private fun SmartReplyChips(onSend: (String) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "FOLLOW UP",
+            text = "DALJE",
             style = MaterialTheme.typography.labelSmall.copy(
                 color = MaterialTheme.ledger.deskInk
             )

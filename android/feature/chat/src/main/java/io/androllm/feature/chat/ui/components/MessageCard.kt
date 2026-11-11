@@ -210,9 +210,9 @@ fun MessageCard(
                 ) {
                     Text(
                         text = when {
-                            isUser -> "YOU"
-                            message.role == MessageRole.SYSTEM -> "NOTE"
-                            else -> "AI"
+                            isUser -> "TI"
+                            message.role == MessageRole.SYSTEM -> "NAPOMENA"
+                            else -> "ALEXA"
                         },
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.SemiBold,

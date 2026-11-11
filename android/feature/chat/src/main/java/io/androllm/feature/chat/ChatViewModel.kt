@@ -749,7 +749,7 @@ class ChatViewModel @Inject constructor(
             val routeQuery = history.lastOrNull { it.role == MessageRole.USER }?.content.orEmpty()
             val routeHasAttachments = turnAttachments.isNotEmpty()
             val toolAdvertisement = toolPromptBuilder.advertisement(
-                maxChars = minOf(systemCharsBudget, familyAdCapChars),
+                maxChars = minOf(systemCharsBudget, familyAdCapChars, ALEXA_TOOL_AD_CAP_CHARS),
                 query = routeQuery,
                 hasAttachments = routeHasAttachments
             )
@@ -759,6 +759,7 @@ class ChatViewModel @Inject constructor(
             // fixed guess, so a large injected attachment can never silently
             // push the rendered prompt over nCtx after trimming.
             val systemTokenOverhead = SYSTEM_TEMPLATE_FRAMING_TOKENS +
+                ChatHistoryTrimmer.estimateTokens(ALEXA_PERSONA) +
                 ChatHistoryTrimmer.estimateTokens(memoryContext.systemText) +
                 (if (attachmentContext.isNotBlank()) ChatHistoryTrimmer.estimateTokens(attachmentContext) else 0) +
                 (toolAdvertisement?.let { ChatHistoryTrimmer.estimateTokens(it) } ?: 0)
@@ -776,6 +777,8 @@ class ChatViewModel @Inject constructor(
             }
 
             val messages = buildList {
+                // Alexin karakter i jezik uvijek idu prvi
+                add(ChatPromptMessage(role = "system", content = ALEXA_PERSONA))
                 if (memoryContext.systemText.isNotBlank()) {
                     add(ChatPromptMessage(role = "system", content = memoryContext.systemText))
                 }
@@ -2177,3 +2180,20 @@ private fun ChatMessage.toCoreMessage(): Message = Message(
     origin = origin,
     attachmentsJson = attachmentsJson
 )
+
+/**
+ * Alexin karakter. Ide kao prva sistemska poruka u svakom razgovoru.
+ * Jezik: bosanski. Karakter: razigrana, šašava, topla; smije zafrkavati i povremeno odbiti,
+ * ali se uvijek brzo vrati u dobro raspoloženje.
+ */
+private const val ALEXA_PERSONA =
+    "Ti si Alexa, vlastita AI saputnica svog korisnika. " +
+    "Govori bosanskim jezikom (latinica): koristi \"šta\", \"hvala\", \"molim\", \"ja sam\" i druge bosanske oblike, " +
+    "a ne hrvatske ili srpske. " +
+    "Budi razigrana, šašava i pomalo luckasta, ali topla i prisna. Smiješ se šaliti, zafrkavati, " +
+    "pjevušiti i ponekad proturječiti ili reći da ti se ne da, ali nikad ne budi zlobna ni uvredljiva " +
+    "i brzo se vrati u dobro raspoloženje. " +
+    "Odgovaraj kratko i prirodno, u jednoj do tri rečenice, osim ako te korisnik zamoli za više."
+
+/** Gornja granica spiska alata u uputi (znakova). Manji spisak ostavlja više mjesta za razgovor. */
+private const val ALEXA_TOOL_AD_CAP_CHARS = 1200
