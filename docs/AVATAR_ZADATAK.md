@@ -10,6 +10,43 @@ Ilustrovan, visoke rezolucije, 2,5D lik: ženska saputnica, razigrana, šašava,
 Lakši za resurse od 3D-a. Mora izgledati živo: treptanje, disanje, govor (usta prate zvuk),
 izrazi lica koji dolaze iz stanja duše (raspoloženje, dosada, ljutnja), i poze za ponašanje na ekranu.
 
+## Referenca izgleda (OBAVEZNO pogledati)
+
+U `docs/avatar/referenca/` su tri slike koje je dao vlasnik projekta: to je Alexa. Lijeva polovina svake slike je
+original (stoji nagnuta prema ekranu, obje dlanove priljubila uz "staklo"), a desna je primjer kako treba da izgleda
+pokret: nasloni se na ekran, malo se okrene, okrene leđa i odmakne se.
+
+Karakteristike lika (držati se slike, ne mijenjati bez odobrenja):
+
+- duga, tamna, valovita kosa sa razdjeljkom po sredini, smeđe oči, topao osmijeh, rumenilo
+- zlatne naušnice s plavim kamenom i resama
+- crveno, sjajno (lateks) odijelo sa zatvaračem i visokim ovratnikom, crne štikle
+- stil: ilustracija visoke rezolucije, jaka kontura, sjajni odsjaji na odijelu, siva pozadina u referenci
+
+Izvor i prava: slike su napravljene vanjskim alatom. Vlasnik projekta mora potvrditi da ima prava korištenja
+za ovu namjenu; to se upisuje u `LICENCE.md` pored modela.
+
+### Posebni pokreti (za koje Live2D rig nije dovoljan)
+
+Pokreti poput "zaleti se na ekran i nasloni se dlanovima", "okreni leđa" i "odmakni se" mijenjaju perspektivu i
+pozu, što Live2D rig sa jednog crteža ne može. Zato mješoviti pristup:
+
+1. **Live2D model (stojeća poza):** disanje, treptanje, govor, izrazi, praćenje pogleda, kosa.
+2. **Zasebne poze kao posebni crteži ili modeli** (isti lik, ista paleta): "nasloni se na ekran" (slika 1 i 2),
+   "okrene leđa" (slika 3), sjedi (na tastaturi). Aplikacija prelazi između njih kratkim prijelazom (cross-fade ili
+   kratka animacija).
+3. **Kratki klipovi** za prijelaze (zalet prema ekranu, okret) kao providna animacija (WebP/APNG ili PNG sekvenca),
+   ako ih alat za animaciju proizvede dovoljno čisto. Ako klipovi imaju artefakte (vidljivo u "Final Effect" na referenci:
+   mutne ivice, deformacije odijela), ne koristiti ih, nego napraviti prijelaz u Live2D-u ili cross-fadeom.
+
+### Šta je teško u ovom liku (planirati unaprijed)
+
+- **Sjajni odsjaji na lateksu:** nacrtati kao ZASEBNE slojeve (odsjaji prsa, bokova, ruku), da se mogu pomjerati i
+  treperiti uz disanje, a ne ostati zalijepljeni.
+- **Duga valovita kosa:** razdvojiti na više grupa pramenova (prednji, bočni, zadnji) s fizikom (`physics3.json`).
+- **Šake i prsti:** posebni slojevi po šaci (dlan, svaki prst ili grupa), jer se pozdravlja i naslanja.
+- **Veličina na telefonu:** lik se na ekranu prikazuje oko trećine visine; ne pretjerivati s brojem mesheva.
+
 ## Ulaz
 
 - Ako postoji 3D model (generisani kandidat): u Blenderu ga renderuj u **odvojene slojeve** (vidi Slojevi).
