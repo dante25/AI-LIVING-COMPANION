@@ -2,9 +2,6 @@ package alexa.app
 
 import alexa.model.CatalogEntry
 import alexa.model.ModelCatalog
-import alexa.permissions.AuditLog
-import alexa.permissions.Capability
-import alexa.permissions.PermissionGate
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
@@ -15,12 +12,10 @@ import android.widget.Toast
 import java.io.File
 
 /**
- * Katalog modela za preuzimanje. Preuzimanje traži uključen prekidač "Internet"
- * u Postavkama i potvrdu korisnika. Svako preuzimanje se bilježi u dnevnik.
+ * Katalog modela za preuzimanje. Preuzimanje nema dozvolu: korisnik sam klikne model,
+ * a napredak se vidi u dijalogu.
  */
 class CatalogActivity : Activity() {
-    private lateinit var appSettings: AppSettings
-    private lateinit var gate: PermissionGate
     private lateinit var downloader: ModelDownloader
     private val entries: List<CatalogEntry> = ModelCatalog.entries
 
@@ -29,8 +24,6 @@ class CatalogActivity : Activity() {
         setContentView(R.layout.activity_list)
         title = getString(R.string.catalog_title)
 
-        appSettings = AppSettings(this)
-        gate = PermissionGate(appSettings.load(), AuditLog())
         downloader = ModelDownloader(File(filesDir, "models"))
 
         findViewById<android.widget.Button>(R.id.action_button).visibility = android.view.View.GONE
@@ -47,28 +40,9 @@ class CatalogActivity : Activity() {
         list.setOnItemClickListener { _, _, position, _ -> confirmDownload(entries[position]) }
     }
 
+    /** Preuzimanje je osnovna funkcija aplikacije: klik na model je dovoljan, bez dozvole i dodatnog pitanja. */
     private fun confirmDownload(entry: CatalogEntry) {
-        val description = "preuzimanje ${entry.name} (${entry.sizeMb} MB)"
-        if (!appSettings.isEnabled(Capability.INTERNET)) {
-            gate.request(Capability.INTERNET, now()) { false } // bilježi se u dnevnik
-            toast("Uključi Internet u Postavkama da bi se model preuzeo")
-            return
-        }
-        val warning = if (entry.sha256 == null) {
-            "\nSažetak fajla još nije provjeren. Preuzimanje se ipak izvodi, ali fajl nije potvrđen."
-        } else {
-            ""
-        }
-        AlertDialog.Builder(this)
-            .setTitle("Preuzeti model?")
-            .setMessage("${entry.name}\n${entry.sizeMb} MB. Preuzima se s interneta.$warning")
-            .setPositiveButton("Preuzmi") { _, _ ->
-                if (gate.confirmAction(description, now()) { true }) startDownload(entry)
-            }
-            .setNegativeButton(R.string.cancel) { _, _ ->
-                gate.confirmAction(description, now()) { false }
-            }
-            .show()
+        startDownload(entry)
     }
 
     private fun startDownload(entry: CatalogEntry) {
