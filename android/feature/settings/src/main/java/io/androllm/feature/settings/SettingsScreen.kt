@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.MotionPhotosOn
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Refresh
@@ -457,6 +458,18 @@ fun SettingsScreen(
                         },
                         onReviewClick = { navController.navigate(io.androllm.core.navigation.Routes.MEMORY_REVIEW) }
                     )
+                }
+
+                settingsAccordionItem(
+                    group = SettingsGroup.Backup,
+                    icon = Icons.Filled.Backup,
+                    expanded = expandedGroup == SettingsGroup.Backup.name,
+                    onToggle = { toggleGroup(SettingsGroup.Backup) },
+                    visible = SettingsGroup.Backup.matches(searchQuery),
+                    subtitle = "Izvezi sve / Uvezi sve",
+                    reduceMotion = settings.reduceMotion
+                ) {
+                    BackupSection()
                 }
 
                 settingsAccordionItem(

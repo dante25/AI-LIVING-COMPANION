@@ -81,6 +81,20 @@ class SoulEngine(
     @Synchronized
     fun snapshot(): SoulState = state
 
+    /** Cijelo trajno stanje (uz stanje i vrijeme zadnjeg kontakta), npr. za sigurnosnu kopiju. */
+    @Synchronized
+    fun exportSnapshot(): SoulSnapshot = SoulSnapshot(state, lastContact, lastText)
+
+    /** Obnavlja stanje iz sigurnosne kopije i odmah ga trajno upisuje. */
+    @Synchronized
+    fun restore(snapshot: SoulSnapshot) {
+        state = snapshot.state
+        lastContact = snapshot.lastContactMillis
+        lastText = snapshot.lastText
+        lastAction = SoulAction.RESPOND
+        store.save(snapshot)
+    }
+
     /** Kratka uputa modelu o trenutnom stanju i ponašanju. */
     fun promptHint(action: SoulAction): String {
         val s = snapshot()

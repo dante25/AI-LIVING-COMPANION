@@ -65,6 +65,7 @@ enum class SettingsGroup {
     Appearance,
     Storage,
     Memory,
+    Backup,
     VoiceAssistant,
     SpeechRecognition,
     TextNormalization,
@@ -94,6 +95,7 @@ internal val SettingsGroup.title: String
         SettingsGroup.Appearance -> "Appearance"
         SettingsGroup.Storage -> "Storage"
         SettingsGroup.Memory -> "Memory"
+        SettingsGroup.Backup -> "Sigurnosna kopija"
         SettingsGroup.VoiceAssistant -> "Voice Assistant"
         SettingsGroup.SpeechRecognition -> "Speech Recognition"
         SettingsGroup.TextNormalization -> "Text Normalization"
@@ -127,6 +129,10 @@ internal val SettingsGroup.keywords: List<String>
         SettingsGroup.Memory -> listOf(
             "embedding", "similarity", "retrieval", "summarize", "export", "import",
             "inspector", "memories", "on-device"
+        )
+        SettingsGroup.Backup -> listOf(
+            "izvezi", "uvezi", "izvezi sve", "uvezi sve", "backup", "export", "import",
+            "sigurnosna kopija", "zip", "restore", "obnova"
         )
         SettingsGroup.VoiceAssistant -> listOf(
             "wake word", "overlay", "hands-free", "assistant", "tts", "voice"

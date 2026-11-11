@@ -54,6 +54,7 @@ dependencies {
     implementation(project(":core:datastore"))
     implementation(project(":core:network"))
     implementation(project(":core:memory"))
+    implementation(project(":core:backup"))
     implementation(project(":core:cloud"))
     implementation(project(":core:attachments"))
     implementation(project(":core:voice"))
