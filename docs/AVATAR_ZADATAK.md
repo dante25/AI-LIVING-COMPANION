@@ -23,8 +23,9 @@ Karakteristike lika (držati se slike, ne mijenjati bez odobrenja):
 - crveno, sjajno (lateks) odijelo sa zatvaračem i visokim ovratnikom, crne štikle
 - stil: ilustracija visoke rezolucije, jaka kontura, sjajni odsjaji na odijelu, siva pozadina u referenci
 
-Izvor i prava: slike su napravljene vanjskim alatom. Vlasnik projekta mora potvrditi da ima prava korištenja
-za ovu namjenu; to se upisuje u `LICENCE.md` pored modela.
+Izvor i prava: slike je izradio sam vlasnik projekta (digitalni alat za slike). U `LICENCE.md` pored modela upisati
+koji je alat korišten, kako se zove i da je autor vlasnik projekta. Ako uslovi tog alata ograničavaju komercijalnu
+upotrebu, to vlasnik projekta provjerava sam kad dođe vrijeme za objavu.
 
 ### Posebni pokreti (za koje Live2D rig nije dovoljan)
 
