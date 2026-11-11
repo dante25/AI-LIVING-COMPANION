@@ -14,6 +14,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.androllm.core.voice.model.VoiceSettings
+import io.androllm.core.voice.stt.SttDefaults
 import io.androllm.core.voice.tts.TtsEngineIds
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -90,9 +91,21 @@ class VoiceSettingsStore @Inject constructor(
         val TN_PHONES = booleanPreferencesKey("tn_phones")
         val TN_ABBREVIATIONS = booleanPreferencesKey("tn_abbreviations")
         val TN_DEBUG = booleanPreferencesKey("tn_debug")
+        val READ_REPLIES_ALOUD = booleanPreferencesKey("read_replies_aloud")
     }
 
     private val dataStore: DataStore<Preferences> = context.voiceDataStore
+
+    /** Ukupni RAM uređaja u GB (za podrazumijevani Whisper model nove instalacije). */
+    private val deviceRamGb: Long by lazy {
+        runCatching {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val info = android.app.ActivityManager.MemoryInfo()
+            am.getMemoryInfo(info)
+            // totalMem je malo ispod nominalnog RAM-a (8 GB uređaj javlja ~7.5 GB), pa zaokružujemo.
+            Math.round(info.totalMem / (1024.0 * 1024.0 * 1024.0))
+        }.getOrDefault(4L)
+    }
 
     val settings: Flow<VoiceSettings> = dataStore.data.map(::fromPreferences)
 
@@ -123,7 +136,7 @@ class VoiceSettingsStore @Inject constructor(
         chargingOnly = p[Keys.CHARGING_ONLY] ?: false,
         silenceTimeoutMs = (p[Keys.SILENCE_TIMEOUT] ?: VoiceSettings().silenceTimeoutMs)
             .coerceIn(VoiceSettings.MIN_SILENCE_TIMEOUT_MS, VoiceSettings.MAX_SILENCE_TIMEOUT_MS),
-        language = p[Keys.LANGUAGE] ?: "en",
+        language = p[Keys.LANGUAGE] ?: SttDefaults.DEFAULT_SPEECH_LANGUAGE,
         autoLanguageDetection = p[Keys.AUTO_LANG_DETECT] ?: true,
         ttsVoice = p[Keys.TTS_VOICE] ?: "Kore",
         ttsEngine = TtsEngineIds.normalize(p[Keys.TTS_ENGINE]),
@@ -142,8 +155,8 @@ class VoiceSettingsStore @Inject constructor(
         noiseSuppression = p[Keys.NOISE_SUPPRESSION] ?: false,
         echoCancellation = p[Keys.ECHO_CANCELLATION] ?: false,
         sttEngine = p[Keys.STT_ENGINE] ?: "whisper",
-        whisperModel = p[Keys.WHISPER_MODEL] ?: "base.en",
-        sttLanguage = p[Keys.STT_LANGUAGE] ?: "auto",
+        whisperModel = p[Keys.WHISPER_MODEL] ?: SttDefaults.defaultWhisperModelId(deviceRamGb),
+        sttLanguage = p[Keys.STT_LANGUAGE] ?: SttDefaults.DEFAULT_STT_LANGUAGE,
         sttTranslate = p[Keys.STT_TRANSLATE] ?: false,
         sttThreads = p[Keys.STT_THREADS] ?: -1,
         sttBeamSize = p[Keys.STT_BEAM] ?: 1,
@@ -170,7 +183,8 @@ class VoiceSettingsStore @Inject constructor(
         tnUrlsEmails = p[Keys.TN_URLS_EMAILS] ?: VoiceSettings().tnUrlsEmails,
         tnPhones = p[Keys.TN_PHONES] ?: VoiceSettings().tnPhones,
         tnAbbreviations = p[Keys.TN_ABBREVIATIONS] ?: VoiceSettings().tnAbbreviations,
-        tnDebug = p[Keys.TN_DEBUG] ?: VoiceSettings().tnDebug
+        tnDebug = p[Keys.TN_DEBUG] ?: VoiceSettings().tnDebug,
+        readRepliesAloud = p[Keys.READ_REPLIES_ALOUD] ?: VoiceSettings().readRepliesAloud
     )
 
     private fun wakePhrasesFrom(p: Preferences): String {
@@ -237,5 +251,6 @@ class VoiceSettingsStore @Inject constructor(
         p[Keys.TN_PHONES] = s.tnPhones
         p[Keys.TN_ABBREVIATIONS] = s.tnAbbreviations
         p[Keys.TN_DEBUG] = s.tnDebug
+        p[Keys.READ_REPLIES_ALOUD] = s.readRepliesAloud
     }
 }

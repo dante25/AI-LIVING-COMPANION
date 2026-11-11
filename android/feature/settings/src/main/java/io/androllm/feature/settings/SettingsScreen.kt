@@ -483,7 +483,7 @@ fun SettingsScreen(
                     expanded = expandedGroup == SettingsGroup.VoiceAssistant.name,
                     onToggle = { toggleGroup(SettingsGroup.VoiceAssistant) },
                     visible = SettingsGroup.VoiceAssistant.matches(searchQuery),
-                    subtitle = if (voiceSettings.enabled) "Listening" else "Off",
+                    subtitle = if (voiceSettings.enabled) "Sluša" else "Glas i govor",
                     reduceMotion = settings.reduceMotion
                 ) {
                     VoiceAssistantSection(
@@ -493,7 +493,10 @@ fun SettingsScreen(
                         onUpdate = { viewModel.updateVoiceSettings(it) },
                         onStart = { viewModel.startVoiceAssistant() },
                         onStop = { viewModel.stopVoiceAssistant() },
-                        onOpenOverlayPermission = { viewModel.openOverlayPermissionSettings() }
+                        onOpenOverlayPermission = { viewModel.openOverlayPermissionSettings() },
+                        whisperInstalledIds = whisperInstalled,
+                        whisperDownload = whisperDownload,
+                        onDownloadWhisperModel = { viewModel.downloadWhisperModel(it) }
                     )
                 }
 

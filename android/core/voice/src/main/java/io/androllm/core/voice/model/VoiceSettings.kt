@@ -18,8 +18,8 @@ data class VoiceSettings(
     val chargingOnly: Boolean = false,
     /** Trailing silence (ms) that ends a voice turn (endpoint detection). */
     val silenceTimeoutMs: Int = 2000,
-    /** Speech language id ("en"). */
-    val language: String = "en",
+    /** Speech language id ("bs" by default). */
+    val language: String = "bs",
     /** Automatically detect speech language. */
     val autoLanguageDetection: Boolean = true,
     /** Gemini TTS voice name ("Kore", "Puck", "Fenrir", "Aoede", "Charon"). */
@@ -53,9 +53,9 @@ data class VoiceSettings(
     /** STT engine id ("whisper" = whisper.cpp, "sherpa" = sherpa-onnx ASR). */
     val sttEngine: String = "whisper",
     /** Installed whisper.cpp model id, e.g. "base.en" / "small" / "large-v3-turbo". */
-    val whisperModel: String = "base.en",
+    val whisperModel: String = "base",
     /** Whisper language ("auto" = auto-detect) or ISO-639 code like "en". */
-    val sttLanguage: String = "auto",
+    val sttLanguage: String = "bs",
     /** Translate non-English speech to English. */
     val sttTranslate: Boolean = false,
     /** Whisper CPU threads (-1 = auto-detect). */
@@ -109,7 +109,10 @@ data class VoiceSettings(
     /** Acronyms & technical terms ("GPU" → "g p u"). */
     val tnAbbreviations: Boolean = true,
     /** Trace each stage to logcat + debug overlay for authoring. */
-    val tnDebug: Boolean = false
+    val tnDebug: Boolean = false,
+
+    /** Čitaj odgovore naglas u običnom chatu (nezavisno od glasovnog asistenta). */
+    val readRepliesAloud: Boolean = true
 ) {
     companion object {
         const val MIN_SENSITIVITY = 0.1f

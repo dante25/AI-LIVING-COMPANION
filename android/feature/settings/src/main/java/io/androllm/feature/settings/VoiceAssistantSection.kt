@@ -70,7 +70,10 @@ fun VoiceAssistantSection(
     onUpdate: (VoiceSettings) -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
-    onOpenOverlayPermission: () -> Unit
+    onOpenOverlayPermission: () -> Unit,
+    whisperInstalledIds: Set<String>? = null,
+    whisperDownload: Pair<String, Float>? = null,
+    onDownloadWhisperModel: (String) -> Unit = {}
 ) {
     var showWakePhraseDialog by remember { mutableStateOf(false) }
     var permissionDenied by remember { mutableStateOf(false) }
@@ -159,6 +162,18 @@ fun VoiceAssistantSection(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
+
+            WhisperModelMissingNotice(
+                modelId = settings.whisperModel,
+                installedIds = whisperInstalledIds,
+                download = whisperDownload,
+                onDownload = onDownloadWhisperModel
+            )
+
+            // Izbor glasa i čitanje odgovora vidljivi su uvijek, i kad je asistent isključen.
+            HorizontalDivider(color = MaterialTheme.ledger.deskHairline)
+            ReadRepliesAloudRow(settings = settings, onUpdate = onUpdate)
+            TtsVoicePickerSection(settings = settings, onUpdate = onUpdate)
 
             if (settings.enabled) {
                 HorizontalDivider(color = MaterialTheme.ledger.deskHairline)
@@ -388,15 +403,7 @@ fun VoiceAssistantSection(
                     )
                 }
 
-                SettingRow(
-                    icon = Icons.Filled.RecordVoiceOver,
-                    title = "Voice language",
-                    value = settings.language.ifBlank { "en" },
-                    onClick = {
-                        val next = VoiceLanguages.next(settings.language)
-                        onUpdate(settings.copy(language = next))
-                    }
-                )
+                SttLanguageSetting(settings = settings, onUpdate = onUpdate)
                 SettingRow(
                     icon = Icons.Filled.RecordVoiceOver,
                     title = "TTS voice",
@@ -406,7 +413,6 @@ fun VoiceAssistantSection(
                         onUpdate(settings.copy(ttsVoice = next))
                     }
                 )
-                TtsVoicePickerSection(settings = settings, onUpdate = onUpdate)
                 ToggleRow(
                     icon = Icons.Filled.Speed,
                     title = "Low latency mode",
@@ -614,16 +620,6 @@ private fun WakePhraseDialog(
             TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.ledger.deskInk) }
         }
     )
-}
-
-/** Supported ASR languages — tap the row to cycle. */
-private object VoiceLanguages {
-    private val codes = listOf("en", "zh", "es", "fr", "de", "ja", "ko", "ru")
-
-    fun next(current: String): String {
-        val idx = codes.indexOf(current.lowercase())
-        return if (idx in codes.indices) codes[(idx + 1) % codes.size] else codes.first()
-    }
 }
 
 /** Gemini TTS voices — tap the row to cycle. */

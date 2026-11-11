@@ -76,15 +76,15 @@ object WhisperModels {
     fun byId(id: String): WhisperModel? = ALL.firstOrNull { it.id == id }
 
     /**
-     * Recommended default model for the device: large-v3-turbo on high-end
-     * SoCs, small on mid-range, base otherwise. Falls back to base.en.
+     * Recommended default model for the device (always multilingual):
+     * large-v3-turbo on high-end SoCs, small on mid-range, base otherwise.
      */
     fun recommendedForDevice(totalRamGb: Long): WhisperModel {
         val preferred = when {
             totalRamGb >= 12 -> "large-v3-turbo"
             totalRamGb >= 6 -> "small"
-            else -> "base.en"
+            else -> "base"
         }
-        return byId(preferred) ?: byId("base.en")!!
+        return byId(preferred) ?: byId("base")!!
     }
 }

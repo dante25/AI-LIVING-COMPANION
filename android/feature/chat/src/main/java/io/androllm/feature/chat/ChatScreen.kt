@@ -169,6 +169,8 @@ fun ChatScreen(
 
     val debugInfo by viewModel.debugInfo.collectAsStateWithLifecycle()
     val genConfig by viewModel.genConfig.collectAsStateWithLifecycle()
+    val isSpeakingNow by viewModel.isSpeaking.collectAsStateWithLifecycle()
+    val speakingMessageId by viewModel.speakingMessageId.collectAsStateWithLifecycle()
 
     val successState = uiState as? ChatUiState.Success
 
@@ -369,6 +371,9 @@ fun ChatScreen(
                                     val onBookmarkToggle = remember(msg.id) {
                                         { viewModel.toggleBookmarkMessage(currentMsg.id, currentMsg.isBookmarked) }
                                     }
+                                    val onSpeak = remember(msg.id) {
+                                        { viewModel.onSpeakMessage(currentMsg.id, currentMsg.content) }
+                                    }
                                     val onSelectToggle = remember(msg.id) {
                                         {
                                             multiSelectIds =
@@ -394,6 +399,8 @@ fun ChatScreen(
                                         onEditPrompt = onEditPrompt,
                                         onDelete = onDelete,
                                         onBookmarkToggle = onBookmarkToggle,
+                                        onSpeak = onSpeak,
+                                        isSpeaking = isSpeakingNow && speakingMessageId == msg.id,
                                         onClick = onSelectToggle,
                                         onLongPress = onLongPress
                                     )

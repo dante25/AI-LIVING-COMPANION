@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -122,6 +123,9 @@ fun MessageCard(
     onEditPrompt: () -> Unit = {},
     onDelete: () -> Unit = {},
     onBookmarkToggle: () -> Unit = {},
+    /** Čitanje poruke naglas (zvučnik); [isSpeaking] pokazuje stop ikonu. */
+    onSpeak: () -> Unit = {},
+    isSpeaking: Boolean = false,
     onStop: () -> Unit = {},
     onClick: () -> Unit = {},
     onLongPress: () -> Unit = {}
@@ -369,6 +373,11 @@ fun MessageCard(
                                 CardIconButton(Icons.Default.Edit, "Edit prompt", MaterialTheme.ledger.deskInk) { onEditPrompt() }
                             } else {
                                 CardIconButton(Icons.Default.Refresh, "Regenerate", MaterialTheme.ledger.deskInk) { onRegenerate() }
+                                CardIconButton(
+                                    if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp,
+                                    if (isSpeaking) "Zaustavi čitanje" else "Čitaj naglas",
+                                    if (isSpeaking) MaterialTheme.ledger.lampDeep else MaterialTheme.ledger.deskInk
+                                ) { onSpeak() }
                                 CardIconButton(
                                     if (message.isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                     if (message.isBookmarked) "Remove bookmark" else "Bookmark",

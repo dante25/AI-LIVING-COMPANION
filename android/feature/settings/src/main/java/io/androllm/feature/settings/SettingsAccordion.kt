@@ -96,7 +96,7 @@ internal val SettingsGroup.title: String
         SettingsGroup.Storage -> "Storage"
         SettingsGroup.Memory -> "Memory"
         SettingsGroup.Backup -> "Sigurnosna kopija"
-        SettingsGroup.VoiceAssistant -> "Voice Assistant"
+        SettingsGroup.VoiceAssistant -> "Glas i asistent"
         SettingsGroup.SpeechRecognition -> "Speech Recognition"
         SettingsGroup.TextNormalization -> "Text Normalization"
         SettingsGroup.Automation -> "Automation / Tool Calling"
@@ -135,7 +135,8 @@ internal val SettingsGroup.keywords: List<String>
             "sigurnosna kopija", "zip", "restore", "obnova"
         )
         SettingsGroup.VoiceAssistant -> listOf(
-            "wake word", "overlay", "hands-free", "assistant", "tts", "voice"
+            "wake word", "overlay", "hands-free", "assistant", "tts", "voice",
+            "glas", "govor", "alexa"
         )
         SettingsGroup.SpeechRecognition -> listOf(
             "whisper", "model", "download", "language", "stt", "recognition", "debug"

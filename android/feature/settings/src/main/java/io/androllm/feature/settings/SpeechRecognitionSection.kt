@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.androllm.core.ui.components.CloudGlassCard
 import io.androllm.core.voice.model.VoiceSettings
+import io.androllm.core.voice.stt.SttDefaults
 import io.androllm.core.voice.stt.WhisperModel
 import io.androllm.core.ui.theme.ledger
 
@@ -72,6 +73,13 @@ fun SpeechRecognitionSection(
         )
 
         HorizontalDivider(color = MaterialTheme.ledger.deskHairline)
+
+        WhisperModelMissingNotice(
+            modelId = settings.whisperModel,
+            installedIds = installedIds,
+            download = download,
+            onDownload = onDownloadModel
+        )
 
         // ── Model download / select ──
         models.forEachIndexed { index, model ->
@@ -178,15 +186,7 @@ fun SpeechRecognitionSection(
         HorizontalDivider(color = MaterialTheme.ledger.deskHairline)
 
         // ── Language ──
-        ToggleRowStt(
-            icon = Icons.Filled.Translate,
-            title = "Language",
-            subtitle = if (settings.sttLanguage == "auto") "Auto-detect" else settings.sttLanguage,
-            checked = settings.sttLanguage == "auto",
-            onCheckedChange = { auto ->
-                onUpdate(settings.copy(sttLanguage = if (auto) "auto" else "en"))
-            }
-        )
+        SttLanguageSetting(settings = settings, onUpdate = onUpdate)
         ToggleRowStt(
             icon = Icons.Filled.Translate,
             title = "Translate to English",
@@ -246,8 +246,8 @@ fun SpeechRecognitionSection(
             TextButton(onClick = {
                 onUpdate(
                     settings.copy(
-                        whisperModel = "base.en",
-                        sttLanguage = "auto",
+                        whisperModel = SttDefaults.FALLBACK_MODEL_ID,
+                        sttLanguage = SttDefaults.DEFAULT_STT_LANGUAGE,
                         sttTranslate = false,
                         sttThreads = -1,
                         sttBeamSize = 1,

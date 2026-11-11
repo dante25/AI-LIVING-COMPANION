@@ -322,16 +322,16 @@ class SettingsViewModel @Inject constructor(
         if (_whisperDownload.value?.first == id) return
         viewModelScope.launch {
             _whisperDownload.value = id to 0f
-            _whisperMessage.value = "Downloading ${model.displayName}…"
+            _whisperMessage.value = "Preuzimanje: ${model.displayName}…"
             runCatching {
                 whisperModelManager.download(model) { done, total ->
                     _whisperDownload.value = id to (if (total > 0) done.toFloat() / total else 0f)
                 }
             }.onSuccess {
                 refreshWhisperModels()
-                _whisperMessage.value = "${model.displayName} installed."
+                _whisperMessage.value = "${model.displayName} je preuzet."
             }.onFailure {
-                _whisperMessage.value = "Download failed: ${it.message}"
+                _whisperMessage.value = "Preuzimanje nije uspjelo: ${it.message}"
             }
             _whisperDownload.value = null
         }

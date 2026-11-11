@@ -102,13 +102,51 @@ class ChatViewModel @Inject constructor(
     private val toolPromptBuilder: ToolPromptBuilder,
     private val settingsRepository: SettingsRepository,
     private val soulEngine: io.androllm.core.soul.SoulEngine,
-    private val sessionManager: io.androllm.core.permissions.SessionManager
+    private val sessionManager: io.androllm.core.permissions.SessionManager,
+    private val readAloudSpeaker: io.androllm.core.voice.tts.ReadAloudSpeaker,
+    private val voiceSettingsStore: io.androllm.core.voice.VoiceSettingsStore
 ) : BaseViewModel() {
 
     override fun onCleared() {
         // Closing the chat ends the permission session (resets "once per session" grants).
         sessionManager.endSession()
+        readAloudSpeaker.stop()
         super.onCleared()
+    }
+
+    // ── Čitanje odgovora naglas ──────────────────────────────────────────────
+
+    private val _speakingMessageId = MutableStateFlow<String?>(null)
+
+    /** Id poruke koja se trenutno čita (ili je zadnja pokrenuta); null = nijedna. */
+    val speakingMessageId: StateFlow<String?> = _speakingMessageId.asStateFlow()
+
+    /** True dok Alexa govori. */
+    val isSpeaking: StateFlow<Boolean> get() = readAloudSpeaker.isSpeaking
+
+    /** Klik na zvučnik u poruci: pokreće čitanje, a ako ta poruka već govori, zaustavlja. */
+    fun onSpeakMessage(messageId: String, text: String) {
+        if (_speakingMessageId.value == messageId && readAloudSpeaker.isSpeaking.value) {
+            stopSpeaking()
+            return
+        }
+        _speakingMessageId.value = messageId
+        readAloudSpeaker.speak(text)
+    }
+
+    fun stopSpeaking() {
+        readAloudSpeaker.stop()
+        _speakingMessageId.value = null
+    }
+
+    private fun speakReplyIfEnabled(messageId: String, text: String) {
+        viewModelScope.launch {
+            val enabled = runCatching { voiceSettingsStore.current().readRepliesAloud }.getOrDefault(false)
+            if (enabled) {
+                _speakingMessageId.value = messageId
+                readAloudSpeaker.speak(text)
+            }
+        }
     }
 
     private val _currentConversationId = MutableStateFlow<String>("")
@@ -590,6 +628,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun loadConversation(conversationId: String?) {
+        stopSpeaking()
         val id = conversationId ?: ""
         _currentConversationId.value = id
         // Loading a specific conversation (e.g. deep-linked from Home/Models)
@@ -612,6 +651,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun createNewConversation(title: String = "New Chat") {
+        stopSpeaking()
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val newId = UUID.randomUUID().toString()
@@ -629,6 +669,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun selectConversation(id: String) {
+        stopSpeaking()
         _currentConversationId.value = id
         // Switching conversations must reset the native engine's chat state
         // (messages + KV cache): the engine keeps one resident context and
@@ -906,6 +947,7 @@ class ChatViewModel @Inject constructor(
 
     fun sendMessage(content: String) {
         sessionManager.touch()
+        stopSpeaking()
         val trimmed = content.trim()
         // A message with attachments may have an empty prompt ("ask about these
         // files"), so only reject a completely empty message with no files.
@@ -2015,6 +2057,7 @@ class ChatViewModel @Inject constructor(
             tracer.mark("room upsert")
             tracer.finish()
         }
+        speakReplyIfEnabled(message.id, trimmed)
     }
 
     private fun appendErrorMessage(message: String) {

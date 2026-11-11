@@ -144,7 +144,9 @@ class ChatViewModelTest {
                 override fun load(): io.androllm.core.soul.SoulSnapshot? = null
                 override fun save(snapshot: io.androllm.core.soul.SoulSnapshot) = Unit
             }),
-            io.androllm.core.permissions.SessionManager { System.currentTimeMillis() }
+            io.androllm.core.permissions.SessionManager { System.currentTimeMillis() },
+            mockk<io.androllm.core.voice.tts.ReadAloudSpeaker>(relaxed = true),
+            mockk<io.androllm.core.voice.VoiceSettingsStore>(relaxed = true)
         )
     }
 
