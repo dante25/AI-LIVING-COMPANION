@@ -11,7 +11,7 @@ package alexa.permissions
  *  - potvrda za osjetljive radnje pita uvijek;
  *  - svaka odluka ide u dnevnik.
  */
-enum class Capability { INTERNET, CAMERA, APP_CONTROL, WEB_SEARCH }
+enum class Capability { INTERNET, MICROPHONE, CAMERA, APP_CONTROL, WEB_SEARCH }
 
 enum class Outcome { ALLOWED, DENIED_BY_SETTING, DENIED_BY_USER, CONFIRMED, REJECTED_BY_USER }
 
@@ -58,6 +58,9 @@ class PermissionGate(
     fun endSession() {
         sessionGrants.clear()
     }
+
+    /** Da li je dozvola već data u ovoj sesiji (da se ne pita ponovo). */
+    fun hasSessionGrant(capability: Capability): Boolean = capability in sessionGrants
 
     /**
      * Traži dozvolu za sposobnost. [ask] je korisnikov odgovor (dijalog).

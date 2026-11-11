@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mini Alexa</string>
+    <string name="hint_message">Napiši Alexi</string>
+    <string name="action_send">Pošalji</string>
+    <string name="action_speak">Govori</string>
+    <string name="action_settings">Postavke</string>
+    <string name="action_memory">Memorija</string>
+    <string name="empty_list">Ništa nije na listi.</string>
+    <string name="settings_title">Postavke</string>
+    <string name="permissions_category">Dozvole (važe samo u sesiji)</string>
+    <string name="permissions_hint">Kamera uvijek pita, bez trajne dozvole. Dozvola se pamti do zatvaranja chata.</string>
+    <string name="internet_title">Internet</string>
+    <string name="internet_summary">Odgovori i pretraga preko interneta</string>
+    <string name="microphone_title">Mikrofon</string>
+    <string name="microphone_summary">Glasovni unos. Pita pri prvom korištenju u sesiji.</string>
+    <string name="camera_title">Kamera</string>
+    <string name="camera_summary">Slikanje na zahtjev. Uvijek pita.</string>
+    <string name="app_control_title">Upravljanje aplikacijama</string>
+    <string name="app_control_summary">Otvaranje i slanje kroz druge aplikacije</string>
+    <string name="web_search_title">Pretraga weba</string>
+    <string name="web_search_summary">Traženje informacija na webu</string>
+    <string name="model_category">Model</string>
+    <string name="model_mode_title">Način rada modela</string>
+    <string name="models_title">Lokalni modeli</string>
+    <string name="models_summary">Uvoz i brisanje modela. Pokretanje modela još nije podržano.</string>
+    <string name="memory_category">Memorija i sadržaj</string>
+    <string name="memory_title">Memorija</string>
+    <string name="memory_summary">Pregled, brisanje pojedinih tvrdnji i brisanje svega</string>
+    <string name="packs_title">Uvezi paket</string>
+    <string name="packs_summary">Odjeća, glas, animacija ili osobnost (zip s manifest.json)</string>
+    <string name="models_import">Uvezi model</string>
+    <string name="models_none">Nema uvezenih modela.</string>
+    <string name="memory_clear_all">Obriši sve razgovore i memoriju</string>
+    <string name="memory_clear_confirm">Briše se cijela historija razgovora i sve tvrdnje. Ne može se vratiti.</string>
+    <string name="cancel">Odustani</string>
+    <string name="delete">Obriši</string>
+</resources>

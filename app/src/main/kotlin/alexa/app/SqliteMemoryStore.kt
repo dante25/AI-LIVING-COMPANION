@@ -101,6 +101,18 @@ class SqliteMemoryStore(context: Context) : SQLiteOpenHelper(context, "alexa.db"
         return replacement
     }
 
+    /** Briše cijelu historiju razgovora i sve tvrdnje. Traži potvrdu korisnika prije poziva. */
+    fun deleteAll() {
+        writableDatabase.beginTransaction()
+        try {
+            writableDatabase.delete("messages", null, null)
+            writableDatabase.delete("memories", null, null)
+            writableDatabase.setTransactionSuccessful()
+        } finally {
+            writableDatabase.endTransaction()
+        }
+    }
+
     /** Briše tvrdnju, ali ne i poruke iz kojih je nastala. */
     override fun delete(memoryId: String) {
         writableDatabase.delete("memories", "id = ?", arrayOf(memoryId))

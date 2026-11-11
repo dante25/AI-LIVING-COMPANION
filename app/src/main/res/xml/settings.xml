@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ekran Postavke. Ključevi prekidača su nazivi dozvola iz core-a (Capability),
+     pa se vrijednosti čitaju isto kao u AppSettings. -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="@string/permissions_category">
+        <SwitchPreference
+            android:key="INTERNET"
+            android:title="@string/internet_title"
+            android:summary="@string/internet_summary"
+            android:defaultValue="false" />
+        <SwitchPreference
+            android:key="MICROPHONE"
+            android:title="@string/microphone_title"
+            android:summary="@string/microphone_summary"
+            android:defaultValue="false" />
+        <SwitchPreference
+            android:key="CAMERA"
+            android:title="@string/camera_title"
+            android:summary="@string/camera_summary"
+            android:defaultValue="false" />
+        <SwitchPreference
+            android:key="APP_CONTROL"
+            android:title="@string/app_control_title"
+            android:summary="@string/app_control_summary"
+            android:defaultValue="false" />
+        <SwitchPreference
+            android:key="WEB_SEARCH"
+            android:title="@string/web_search_title"
+            android:summary="@string/web_search_summary"
+            android:defaultValue="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/model_category">
+        <ListPreference
+            android:key="model_mode"
+            android:title="@string/model_mode_title"
+            android:entries="@array/model_mode_entries"
+            android:entryValues="@array/model_mode_values"
+            android:defaultValue="LOCAL" />
+        <Preference
+            android:key="models"
+            android:title="@string/models_title"
+            android:summary="@string/models_summary">
+            <intent
+                android:targetPackage="alexa.app"
+                android:targetClass="alexa.app.ModelsActivity" />
+        </Preference>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/memory_category">
+        <Preference
+            android:key="memory"
+            android:title="@string/memory_title"
+            android:summary="@string/memory_summary">
+            <intent
+                android:targetPackage="alexa.app"
+                android:targetClass="alexa.app.MemoryActivity" />
+        </Preference>
+        <Preference
+            android:key="packs"
+            android:title="@string/packs_title"
+            android:summary="@string/packs_summary" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="model_mode_entries">
+        <item>Lokalno</item>
+        <item>Oblak (još nije aktivan, nema API ključa)</item>
+    </string-array>
+    <string-array name="model_mode_values">
+        <item>LOCAL</item>
+        <item>CLOUD</item>
+    </string-array>
+</resources>

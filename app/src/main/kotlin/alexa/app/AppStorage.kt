@@ -8,12 +8,19 @@ import java.io.InputStream
 
 /** Dozvole u postavkama se pamte između pokretanja. Dozvole u sesiji se ne pamte. */
 class AppSettings(context: Context) {
-    private val prefs = context.getSharedPreferences("alexa-settings", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun load(): PermissionSettings {
         val settings = PermissionSettings()
-        Capability.entries.forEach { settings.set(it, prefs.getBoolean(it.name, false)) }
+        Capability.entries.forEach { settings.set(it, isEnabled(it)) }
         return settings
+    }
+
+    fun isEnabled(capability: Capability): Boolean = prefs.getBoolean(capability.name, false)
+
+    companion object {
+        /** Isti naziv koristi i ekran Postavke, pa su vrijednosti jedne te iste. */
+        const val PREFS_NAME = "alexa-settings"
     }
 
     fun save(capability: Capability, enabled: Boolean) {
